@@ -8,11 +8,19 @@ import {
   safeStorage,
   session,
   shell,
+  systemPreferences,
 } from "electron";
 import path from "node:path";
 import { appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { launchExternal, registerExternalLinks } from "./external-links";
 import { pathToFileURL } from "node:url";
+import {
+  answerMediaPermissionRequest,
+  checkMediaPermission,
+  oncePermissionReply,
+  type MediaPermissionContext,
+  type MediaPermissionDetails,
+} from "./permissions";
 
 app.setName("Cadence");
 
@@ -78,58 +86,149 @@ async function openExternal(url: string) {
     });
 }
 
+function logPermissionEvent(event: Record<string, string | boolean | number>) {
+  try {
+    const directory = app.getPath("logs");
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const file = path.join(directory, "recording-permissions.log");
+    try {
+      if (statSync(file).size > 262144) renameSync(file, file + ".previous");
+    } catch {
+      /* First event. */
+    }
+    // Only decision/status metadata: no URLs, device names, window titles,
+    // captured content, credentials or transcripts enter this diagnostic log.
+    appendFileSync(
+      file,
+      JSON.stringify({ time: new Date().toISOString(), ...event }) + "\n",
+      { mode: 0o600 },
+    );
+  } catch {
+    /* Diagnostics must never affect permission handling. */
+  }
+}
+
 function configurePermissions() {
   const ses = session.defaultSession;
+  function context(
+    contents: Electron.WebContents | null,
+    details: MediaPermissionDetails,
+    requestingOrigin?: string,
+  ): MediaPermissionContext {
+    const expectedContents =
+      mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+    return {
+      expectedOrigin: origin,
+      rendererUrl: expectedContents?.getURL() ?? "",
+      sameWebContents: !!expectedContents && contents === expectedContents,
+      requestingOrigin,
+      details,
+    };
+  }
   ses.setPermissionCheckHandler(
     (contents, permission, requestingOrigin, details) => {
-      const local =
-        contents === mainWindow?.webContents &&
-        isLocalApp(requestingOrigin) &&
-        details.isMainFrame;
-      if (!local) return false;
-      if (permission === "media") return details.mediaType === "audio";
-      return permission === "display-capture";
+      const allowed = checkMediaPermission(
+        permission,
+        context(contents, details, requestingOrigin),
+      );
+      if (permission === "media" || permission === "display-capture")
+        logPermissionEvent({
+          event: "check",
+          permission,
+          allowed,
+          mainFrame: details.isMainFrame === true,
+          mediaType: details.mediaType ?? "unspecified",
+        });
+      return allowed;
     },
   );
   ses.setPermissionRequestHandler((contents, permission, callback, details) => {
-    const local =
-      contents === mainWindow?.webContents &&
-      isLocalApp(details.requestingUrl) &&
-      details.isMainFrame;
-    const mediaTypes =
-      "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
-    const audioOnly =
-      permission === "media" &&
-      mediaTypes.length > 0 &&
-      mediaTypes.every((type) => type === "audio");
-    callback(Boolean(local && (audioOnly || permission === "display-capture")));
+    void answerMediaPermissionRequest({
+      permission,
+      context: () => context(contents, details),
+      callback,
+      requestMicrophone: async () => {
+        if (process.platform !== "darwin") return true;
+        logPermissionEvent({
+          event: "microphone-os-request",
+          status: systemPreferences.getMediaAccessStatus("microphone"),
+        });
+        // Await the actual OS request on every trusted mic attempt. Existing
+        // denials/grants resolve through macOS; no permission state is reset.
+        const granted = await systemPreferences.askForMediaAccess("microphone");
+        logPermissionEvent({
+          event: "microphone-os-result",
+          granted,
+          status: systemPreferences.getMediaAccessStatus("microphone"),
+        });
+        return granted;
+      },
+      log: (decision) =>
+        logPermissionEvent({
+          event: "request",
+          permission,
+          allowed: decision.allowed,
+          reason: decision.reason,
+        }),
+    });
   });
   ses.setDisplayMediaRequestHandler(async (request, callback) => {
-    if (
-      !mainWindow ||
-      request.frame !== mainWindow.webContents.mainFrame ||
-      !isLocalApp(request.securityOrigin) ||
-      !request.userGesture ||
-      !request.audioRequested
-    ) {
-      callback({});
+    // Electron documents null as denial, although its v44 types omit it.
+    // https://www.electronjs.org/docs/latest/api/session#setdisplaymediarequesthandlerhandler-opts
+    const reply = oncePermissionReply<Electron.Streams | null>(
+      (streams) => callback(streams as Electron.Streams),
+      () => logPermissionEvent({ event: "display-callback-unavailable" }),
+    );
+    const trusted = () =>
+      !!mainWindow &&
+      !mainWindow.isDestroyed() &&
+      !!request.frame &&
+      !request.frame.isDestroyed() &&
+      request.frame === mainWindow.webContents.mainFrame &&
+      isLocalApp(request.securityOrigin) &&
+      request.userGesture &&
+      request.audioRequested;
+    if (!trusted()) {
+      logPermissionEvent({
+        event: "display-denied",
+        reason: "untrusted-frame-or-missing-gesture-or-audio",
+      });
+      reply(null);
       return;
     }
     try {
-      // A tiny video source is required by Chromium's getDisplayMedia API. The
-      // renderer sends only the mixed audio track to MediaRecorder.
+      logPermissionEvent({
+        event: "display-os-request",
+        screenStatus:
+          process.platform === "darwin"
+            ? systemPreferences.getMediaAccessStatus("screen")
+            : "not-applicable",
+      });
+      // Do not preemptively reject based on OS status: requesting the source
+      // lets macOS show its own permission flow. Only audio is saved downstream.
       const sources = await desktopCapturer.getSources({
         types: ["screen"],
         thumbnailSize: { width: 0, height: 0 },
       });
-      if (!sources.length || request.frame?.isDestroyed()) {
-        callback({});
+      if (!sources.length || !trusted()) {
+        logPermissionEvent({
+          event: "display-denied",
+          reason: sources.length
+            ? "frame-changed-during-source-request"
+            : "no-screen-source",
+          sourceCount: sources.length,
+        });
+        reply(null);
         return;
       }
-      callback({ video: sources[0], audio: "loopback" });
-    } catch (error) {
-      console.error("System-audio capture permission or source error:", error);
-      callback({});
+      logPermissionEvent({ event: "display-source-selected" });
+      reply({ video: sources[0], audio: "loopback" });
+    } catch {
+      logPermissionEvent({
+        event: "display-denied",
+        reason: "system-source-request-failed",
+      });
+      reply(null);
     }
   });
 }
