@@ -1,0 +1,31 @@
+appId: com.cadence.meetingnotes
+productName: Cadence
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-desktop/**
+  - dist-server/**
+  - package.json
+extraResources:
+  - from: scripts
+    to: scripts
+    filter:
+      - '*.py'
+      - '*.txt'
+asar: true
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dir
+      arch:
+        - arm64
+  extendInfo:
+    NSMicrophoneUsageDescription: Cadence records your microphone so your voice is included in your meeting transcript.
+    NSAudioCaptureUsageDescription: Cadence records call audio playing on your computer to transcribe and summarize your meeting.
+    NSScreenCaptureUsageDescription: Cadence accesses system audio from your screen sharing session. It saves audio only.
+win:
+  target: nsis
+linux:
+  target: AppImage
+  category: Office
