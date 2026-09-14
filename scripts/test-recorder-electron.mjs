@@ -29,6 +29,11 @@ try {
   // This isolated test does not use the production preload or the user's data.
   // Device APIs return generated AudioContext streams; no permission is requested.
   const test = async function () {
+    const nativeAudioContext = window.AudioContext;
+    const audioContexts = [];
+    window.AudioContext = class extends nativeAudioContext {
+      constructor(...args) { super(...args); audioContexts.push(this); }
+    };
     const synth = new AudioContext();
     await synth.resume();
     const makeTone = (frequency) => {
@@ -59,12 +64,21 @@ try {
     });
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await recorder.start();
-    await sleep(700);
+    // Wait for real input: a cold audio service can take over a second to render.
+    const readyDeadline = performance.now() + 8000;
+    while (capturedLevels.mic < 0.01 || capturedLevels.system < 0.01) {
+      if (performance.now() > readyDeadline) throw new Error('Synthetic audio did not start rendering: ' + JSON.stringify(audioContexts.map(context => ({state: context.state, seconds: context.currentTime}))));
+      await sleep(50);
+    }
+    await sleep(1000);
     recorder.pause();
     await sleep(250);
     recorder.resume();
-    await sleep(700);
-    const result = await recorder.stop();
+    await sleep(1000);
+    const clocks = audioContexts.map(context => ({ state: context.state, seconds: context.currentTime, sampleRate: context.sampleRate }));
+    let result;
+    try { result = await recorder.stop(); }
+    catch (error) { throw new Error(JSON.stringify({ message: error.message, clocks, capturedLevels, tracks: system.destination.stream.getTracks().map(track => ({readyState: track.readyState, muted: track.muted})) })); }
     microphone.oscillator.stop();
     system.oscillator.stop();
     await synth.close();
@@ -125,7 +139,7 @@ app.whenReady().then(async()=>{
   });
   const result = JSON.parse(await readFile(report, "utf8"));
   assert(
-    result.durationMs >= 1200 && result.durationMs < 2400,
+    result.durationMs >= 1900 && result.durationMs < 11000,
     `Unexpected active recording duration: ${result.durationMs}`,
   );
   assert(
@@ -170,16 +184,20 @@ app.whenReady().then(async()=>{
   const samples = new Float32Array(
     pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength),
   );
+  assert(samples.length / 48000 >= 1.7, 'The decoded recording must contain the two seconds of established input');
   const amplitude = (frequency) => {
-    let real = 0,
-      imaginary = 0;
-    for (let i = 0; i < samples.length; i++) {
-      real += samples[i] * Math.cos((2 * Math.PI * frequency * i) / 48000);
-      imaginary += samples[i] * Math.sin((2 * Math.PI * frequency * i) / 48000);
+    let maximum = 0;
+    // Complete windows avoid phase cancellation across a paused interval.
+    const windowSize = 4800;
+    for (let offset = 0; offset + windowSize <= samples.length; offset += windowSize) {
+      let real = 0, imaginary = 0;
+      for (let i = 0; i < windowSize; i++) {
+        real += samples[offset + i] * Math.cos((2 * Math.PI * frequency * i) / 48000);
+        imaginary += samples[offset + i] * Math.sin((2 * Math.PI * frequency * i) / 48000);
+      }
+      maximum = Math.max(maximum, 2 * Math.sqrt(real * real + imaginary * imaginary) / windowSize);
     }
-    return (
-      (2 * Math.sqrt(real * real + imaginary * imaginary)) / samples.length
-    );
+    return maximum;
   };
   const micAmplitude = amplitude(220),
     systemAmplitude = amplitude(440);

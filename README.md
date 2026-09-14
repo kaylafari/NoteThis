@@ -12,14 +12,14 @@ Open **Launch Cadence.command** in the project folder, or:
 npm run desktop
 ```
 
-The launcher starts the project-local Ollama runtime when it is available and no Ollama service is already listening. It builds the UI and opens Electron. For the best macOS system-audio permission behavior, build and open the packaged application:
+The double-click launcher opens the packaged macOS application and starts the project-local Ollama runtime when available and no Ollama service is already listening. `npm run desktop` builds and opens the development version. Rebuild the packaged application after changing source code:
 
 ```sh
 npm run package
-open release/mac-arm64/Cadence.app
+node scripts/launch.mjs --packaged
 ```
 
-The packaged application requires your local Ollama service to be running. API-key providers can be used without Ollama. On first recording, allow the macOS microphone/system-audio prompts. Use the live source meters to confirm both voices are arriving. See [recording setup](docs/recording.md).
+Opening the `.app` directly requires your local Ollama service to be running; the `.command` launcher handles the project-local runtime for you. API-key providers can be used without Ollama. On first recording, allow the macOS microphone/system-audio prompts. Use the live source meters to confirm both voices are arriving. See [recording setup](docs/recording.md).
 
 ## Fresh setup
 

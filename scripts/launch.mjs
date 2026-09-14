@@ -27,8 +27,12 @@ try {
       "Start Ollama to use local meeting intelligence, or choose a cloud model in Settings.",
     );
 }
-const { default: electron } = await import("electron");
-const app = spawn(electron, ["."], {
+const packaged = path.join(root, "release", "mac-arm64", "Cadence.app");
+const usePackaged = process.argv.includes("--packaged") && existsSync(packaged);
+const executable = usePackaged
+  ? "/usr/bin/open"
+  : (await import("electron")).default;
+const app = spawn(executable, usePackaged ? ["-W", packaged] : ["."], {
   cwd: root,
   env: process.env,
   stdio: "inherit",
