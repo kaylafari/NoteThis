@@ -204,6 +204,9 @@ export default function App() {
   const [transcriptSearch, setTranscriptSearch] = useState("");
   const [editingTitle, setEditingTitle] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (showRecord) audio.current?.pause();
+  }, [showRecord]);
   const upload = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 

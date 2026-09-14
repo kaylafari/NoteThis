@@ -2,6 +2,8 @@
 
 A local-first desktop meeting recorder: capture microphone + computer audio, upload recordings, replay words in sync with audio, generate meeting notes and action items, and ask questions grounded in the transcript.
 
+![Cadence transcript playback](docs/workspace.jpg)
+
 ## Run on this Mac
 
 Open **Launch Cadence.command** in the project folder, or:
@@ -80,6 +82,7 @@ See [provider support and source references](docs/providers.md) for exact capabi
 npm run dev          # browser preview 127.0.0.1:4317, API 127.0.0.1:4318
 npm run typecheck
 npm test             # storage, API workflow, providers, OAuth, recorder, locks
+npm run test:local    # real Whisper + Ollama pipeline on the synthetic sample
 npm run test:audio    # real Electron Web Audio/MediaRecorder synthetic two-source test
 npm run build        # React + desktop main/preload + local server
 npm run package      # Apple Silicon .app under release/

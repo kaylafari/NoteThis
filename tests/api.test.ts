@@ -38,6 +38,7 @@ vi.mock("../server/oauth", () => ({
   disconnectOAuth: vi.fn(),
 }));
 import { startServer } from "../server/index";
+import { transcribeAudio } from "../server/providers";
 let dataDir: string,
   base: string,
   server: Awaited<ReturnType<typeof startServer>>;
@@ -160,5 +161,73 @@ describe("local API workflow", () => {
         })
       ).status,
     ).toBe(400);
+  });
+});
+
+describe("queued job isolation", () => {
+  it("reserves meetings before awaits and freezes provider choices when queued", async () => {
+    const fixture = await (await request("/meetings/fixture")).json();
+    await writeFile(
+      path.join(dataDir, "meetings", "queued.json"),
+      JSON.stringify({ ...fixture, id: "queued" }),
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const adapter = vi.mocked(transcribeAudio);
+    adapter.mockImplementationOnce(async () => {
+      await gate;
+      return { segments: fixture.segments, duration: 1, timing: "word" };
+    });
+    const first = await request("/meetings/fixture/transcribe", {
+      method: "POST",
+      headers,
+    });
+    expect(first.status).toBe(202);
+    expect(
+      (
+        await request("/meetings/fixture/transcribe", {
+          method: "POST",
+          headers,
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await request("/meetings/fixture/chat", {
+          method: "POST",
+          headers,
+          body: '{"message":"Hello"}',
+        })
+      ).status,
+    ).toBe(409);
+    const queued = await request("/meetings/queued/transcribe", {
+      method: "POST",
+      headers,
+    });
+    expect(queued.status).toBe(202);
+    await request("/settings", {
+      method: "PUT",
+      headers,
+      body: '{"stt":{"provider":"local","model":"tiny","language":"fr"}}',
+    });
+    release();
+    for (let i = 0; i < 100; i++) {
+      const result = await (await request("/meetings/queued")).json();
+      if (!["transcribing", "summarizing"].includes(result.status)) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const finalSettings = adapter.mock.calls.at(-1)![1];
+    expect(finalSettings.stt.model).toBe("base");
+    expect(finalSettings.stt.language).toBe("");
+  });
+  it("allows blank OAuth input so provider adapters can accept default domains", async () => {
+    const result = await request("/oauth/session/test/input", {
+      method: "POST",
+      headers,
+      body: '{"text":""}',
+    });
+    expect(result.status).toBe(200);
   });
 });

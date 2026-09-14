@@ -147,20 +147,40 @@ export async function startServer(options: ServerOptions = {}) {
         { status: 409 },
       );
   };
+  async function withMeetingLock<T>(
+    id: string,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    idle(id);
+    busy.add(id);
+    try {
+      return await work();
+    } finally {
+      busy.delete(id);
+    }
+  }
   async function background(id: string, kind: "transcribing" | "summarizing") {
     idle(id);
-    let meeting = await getMeeting(id);
-    if (kind === "summarizing" && !meeting.segments.length)
-      throw Object.assign(new Error("Transcribe this meeting first."), {
-        status: 400,
-      });
     busy.add(id);
-    meeting.status = kind;
-    meeting.progress = "Queued for processing";
-    delete meeting.error;
-    await store.save(meeting);
+    let meeting: Meeting;
+    // Freeze routing at enqueue time so another meeting's settings cannot send
+    // this recording to a different provider while it waits in the queue.
+    const settings = await store.getSettings();
+    try {
+      meeting = await getMeeting(id);
+      if (kind === "summarizing" && !meeting.segments.length)
+        throw Object.assign(new Error("Transcribe this meeting first."), {
+          status: 400,
+        });
+      meeting.status = kind;
+      meeting.progress = "Queued for processing";
+      delete meeting.error;
+      await store.save(meeting);
+    } catch (error) {
+      busy.delete(id);
+      throw error;
+    }
     const work = async () => {
-      const settings = await store.getSettings();
       const updateProgress = (progress: string) => {
         meeting.progress = progress;
       };
@@ -357,18 +377,20 @@ export async function startServer(options: ServerOptions = {}) {
     }
   });
   app.patch("/api/meetings/:id", async (req, res) => {
-    idle(req.params.id);
     const update = z
       .object({ title: z.string().trim().min(1).max(160) })
       .parse(req.body);
     res.json(
-      await store.save({ ...(await getMeeting(req.params.id)), ...update }),
+      await withMeetingLock(req.params.id, async () =>
+        store.save({ ...(await getMeeting(req.params.id)), ...update }),
+      ),
     );
   });
   app.delete("/api/meetings/:id", async (req, res) => {
-    idle(req.params.id);
-    await getMeeting(req.params.id);
-    await store.remove(req.params.id);
+    await withMeetingLock(req.params.id, async () => {
+      await getMeeting(req.params.id);
+      await store.remove(req.params.id);
+    });
     res.json({ ok: true });
   });
   app.get("/api/meetings/:id/audio", async (req, res) => {
@@ -382,47 +404,52 @@ export async function startServer(options: ServerOptions = {}) {
     res.status(202).json(await background(req.params.id, "summarizing")),
   );
   app.patch("/api/meetings/:id/actions/:actionId", async (req, res) => {
-    idle(req.params.id);
     const { done } = z.object({ done: z.boolean() }).parse(req.body);
-    const m = await getMeeting(req.params.id);
-    const action = m.insight?.actions.find((a) => a.id === req.params.actionId);
-    if (!action) return res.status(404).json({ error: "Action not found." });
-    action.done = done;
-    res.json(await store.save(m));
+    res.json(
+      await withMeetingLock(req.params.id, async () => {
+        const meeting = await getMeeting(req.params.id);
+        const action = meeting.insight?.actions.find(
+          (a) => a.id === req.params.actionId,
+        );
+        if (!action)
+          throw Object.assign(new Error("Action not found."), { status: 404 });
+        action.done = done;
+        return store.save(meeting);
+      }),
+    );
   });
   app.post("/api/meetings/:id/chat", async (req, res) => {
     const { message } = z
       .object({ message: z.string().trim().min(1).max(4000) })
       .parse(req.body);
-    idle(req.params.id);
-    const meeting = await getMeeting(req.params.id);
-    if (!meeting.segments.length)
-      return res
-        .status(400)
-        .json({ error: "Transcribe the audio before asking questions." });
-    busy.add(meeting.id);
-    try {
-      const reply = await answerQuestion(
-        meeting.segments,
-        message,
-        meeting.messages,
-        await store.getSettings(),
-        getKey,
-      );
-      meeting.messages.push(
-        {
-          id: randomUUID(),
-          role: "user",
-          text: message,
-          createdAt: new Date().toISOString(),
-        },
-        reply,
-      );
-      await store.save(meeting);
-      res.json(reply);
-    } finally {
-      busy.delete(meeting.id);
-    }
+    res.json(
+      await withMeetingLock(req.params.id, async () => {
+        const meeting = await getMeeting(req.params.id);
+        if (!meeting.segments.length)
+          throw Object.assign(
+            new Error("Transcribe the audio before asking questions."),
+            { status: 400 },
+          );
+        const reply = await answerQuestion(
+          meeting.segments,
+          message,
+          meeting.messages,
+          await store.getSettings(),
+          getKey,
+        );
+        meeting.messages.push(
+          {
+            id: randomUUID(),
+            role: "user",
+            text: message,
+            createdAt: new Date().toISOString(),
+          },
+          reply,
+        );
+        await store.save(meeting);
+        return reply;
+      }),
+    );
   });
   app.post("/api/oauth/:provider/start", (req, res) =>
     res.json(startOAuth(req.params.provider)),
