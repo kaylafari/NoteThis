@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "package": "npm run build && electron-builder --mac --arm64 dir",
     "setup:local": "node scripts/setup-local.mjs",
-    "test:audio": "node scripts/test-recorder-electron.mjs"
+    "test:audio": "node scripts/test-recorder-electron.mjs",
+    "format": "prettier --write src server desktop shared tests \"scripts/*.mjs\" *.json *.ts"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "latest",
@@ -40,6 +41,7 @@
     "electron": "latest",
     "electron-builder": "latest",
     "esbuild": "latest",
+    "prettier": "^3.9.6",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vite": "latest",
