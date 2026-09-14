@@ -50,7 +50,7 @@ The small default LLM can miss nuance. Review summaries, owners, and deadlines a
 2. **Import audio:** choose or drop WAV, MP3, M4A, WebM, OGG, FLAC, AAC, MP4, or AIFF. Original audio is stored locally before processing.
 3. **Review transcript:** play/pause, seek, change playback speed, search, and follow highlighted words. Click a word or timestamp to seek. Timing from text-only providers is explicitly labeled estimated.
 4. **Review notes:** read the summary and decisions, check off actions, and jump to source evidence where supplied.
-5. **Ask this meeting:** questions use transcript evidence and recent chat context; verified segment citations are clickable. For very long calls the assistant uses relevant excerpts and discloses that it has excerpts.
+5. **Ask this meeting:** questions use transcript evidence and recent chat context; transcript citations are clickable. For very long calls the assistant uses relevant excerpts and discloses that it has excerpts.
 6. **Export:** download meeting notes and transcript as Markdown. The sample button adds an explicitly labeled synthetic meeting for trying the UI without recording anyone.
 
 Recording is live; transcription and notes run after saving. It does not stream a live transcript during the call. Recording bytes remain in memory until saved, so keep the app open. The app asks before discarding an unsaved recording. Once saved, audio persists even when processing fails; retry transcription or summary after fixing the model connection.

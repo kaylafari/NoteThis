@@ -198,17 +198,15 @@ describe("speech adapter wire formats", () => {
     directory = await mkdtemp(path.join(tmpdir(), "aim-provider-test-"));
     audio = path.join(directory, "sample.wav");
     await writeFile(audio, new Uint8Array([82, 73, 70, 70]));
-    mock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            text: "test",
-            words: [{ word: "test", start: 1, end: 2 }],
-          }),
-          { status: 200 },
-        ),
-      );
+    mock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "test",
+          words: [{ word: "test", start: 1, end: 2 }],
+        }),
+        { status: 200 },
+      ),
+    );
     vi.stubGlobal("fetch", mock);
   });
   afterEach(async () => {
@@ -326,6 +324,40 @@ describe("speech adapter wire formats", () => {
       expect(String(e)).not.toContain("test-secret");
       expect(String(e)).not.toContain("private account");
     }
+  });
+  it("passes an explicit JSON schema only to structured Ollama requests", async () => {
+    mock.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({ message: { content: '{"summary":"A meeting"}' } }),
+        ),
+    );
+    const schema = {
+      type: "object",
+      properties: { summary: { type: "string" } },
+      required: ["summary"],
+    };
+    await generateText("system", "summarize", settings, async () => undefined, {
+      jsonSchema: schema,
+    });
+    const structured = JSON.parse(mock.mock.calls[0][1].body);
+    expect(structured.format).toEqual(schema);
+    expect(structured.options.temperature).toBe(0);
+    await generateText(
+      "system",
+      "answer a question",
+      settings,
+      async () => undefined,
+    );
+    expect(JSON.parse(mock.mock.calls[1][1].body)).not.toHaveProperty("format");
+  });
+  it("explains how to install a missing Ollama model without exposing error bodies", async () => {
+    mock.mockResolvedValue(
+      new Response("private server details", { status: 404 }),
+    );
+    await expect(
+      generateText("system", "question", settings, async () => undefined),
+    ).rejects.toThrow("ollama pull qwen3:0.6b");
   });
   it("uses local Ollama without reading cloud credentials", async () => {
     mock.mockResolvedValue(

@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 vi.mock("../server/providers", () => ({ generateText: vi.fn() }));
 import {
   MAX_MODEL_INPUT_BYTES,
+  insightSchema,
   summarize,
   answerQuestion,
   transcriptText,
@@ -30,6 +31,45 @@ describe("transcript grounded notes", () => {
     expect(notes.actions[0].segmentId).toBe("s1");
     expect(notes.actions[1].segmentId).toBeUndefined();
     expect(notes.actions[0].done).toBe(false);
+  });
+  it("does not retain owner or deadline metadata absent from its cited source", () => {
+    const notes = parseInsight(
+      JSON.stringify({
+        summary: "A meeting",
+        decisions: [],
+        actions: [
+          {
+            text: "Send proposal",
+            owner: "Team",
+            due: "next month",
+            segmentId: "s1",
+          },
+          {
+            text: "Send proposal",
+            owner: "Maya",
+            due: "Friday",
+            segmentId: "s1",
+          },
+        ],
+      }),
+      segments,
+    );
+    const substring = parseInsight(
+      JSON.stringify({
+        summary: "Meeting",
+        decisions: [],
+        actions: [
+          { text: "Send proposal", owner: "May", due: "day", segmentId: "s1" },
+        ],
+      }),
+      segments,
+    );
+    expect(substring.actions[0].owner).toBeUndefined();
+    expect(substring.actions[0].due).toBeUndefined();
+    expect(notes.actions[0].owner).toBeUndefined();
+    expect(notes.actions[0].due).toBeUndefined();
+    expect(notes.actions[1].owner).toBe("Maya");
+    expect(notes.actions[1].due).toBe("Friday");
   });
   it("rejects prose-only and malformed note responses", () => {
     expect(() => parseInsight("Here are notes", segments)).toThrow(
@@ -141,6 +181,10 @@ describe("bounded long-meeting intelligence", () => {
     expect(reductions).toBeGreaterThan(1);
     for (let i = 0; i < 120; i++) expect(finalEvidence).toContain(`[s${i}]`);
     expect(notes.actions[0].segmentId).toBe("s119");
+    expect(model.mock.calls.at(-1)?.[4]?.jsonSchema).toEqual(insightSchema);
+    expect(
+      model.mock.calls.slice(0, -1).every((call) => !call[4]?.jsonSchema),
+    ).toBe(true);
     assertBudgets();
     expect(model.mock.calls.length).toBeLessThan(100);
   });

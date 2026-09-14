@@ -782,11 +782,14 @@ export function validateEndpoint(value: string): string {
     );
   return value.replace(/\/+$/, "");
 }
+export type GenerationOptions = { jsonSchema?: Record<string, unknown> };
+
 export async function generateText(
   system: string,
   prompt: string,
   settings: Settings,
   getKey: GetKey,
+  options: GenerationOptions = {},
 ): Promise<string> {
   const { provider, model: modelId } = settings.llm;
   if (!modelId.trim()) throw new Error("Choose a language model in Settings.");
@@ -794,25 +797,39 @@ export async function generateText(
     const base = validateEndpoint(
       settings.local.ollamaUrl || "http://127.0.0.1:11434",
     );
-    const data = await requestJson(
-      `${base}/api/chat`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: modelId,
-          stream: false,
-          think: false,
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: prompt },
-          ],
-          options: { temperature: 0.2, num_ctx: 16384, num_predict: 4096 },
-        }),
-      },
-      "Ollama",
-      10 * 60_000,
-    );
+    let data: RecordValue;
+    try {
+      data = await requestJson(
+        `${base}/api/chat`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: modelId,
+            stream: false,
+            think: false,
+            ...(options.jsonSchema ? { format: options.jsonSchema } : {}),
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: prompt },
+            ],
+            options: {
+              temperature: options.jsonSchema ? 0 : 0.2,
+              num_ctx: 16384,
+              num_predict: 4096,
+            },
+          }),
+        },
+        "Ollama",
+        10 * 60_000,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("HTTP 404"))
+        throw new Error(
+          `Ollama could not find the selected model. Run ollama pull ${modelId} on the Ollama server, then try again.`,
+        );
+      throw error;
+    }
     const result = str(obj(data.message).content).trim();
     if (!result)
       throw new Error(

@@ -84,6 +84,28 @@ try {
     reply.citations.length,
     "Answer did not cite a real transcript segment",
   );
+  assert.ok(
+    reply.citations.some((id) => {
+      const source =
+        meeting.segments.find((segment) => segment.id === id)?.text || "";
+      return (
+        source.toLowerCase().includes("budget") &&
+        source.replace(/[$,]/g, "").includes("5000")
+      );
+    }),
+    "Budget answer cited an existing segment that does not support the budget claim",
+  );
+  for (const action of meeting.insight.actions) {
+    if (!action.owner) continue;
+    const source =
+      meeting.segments.find((segment) => segment.id === action.segmentId)
+        ?.text || "";
+    assert.ok(
+      source.toLowerCase().includes(action.owner.toLowerCase()),
+      "Action owner is absent from the cited source",
+    );
+  }
+
   const range = await fetch(`${base}/meetings/${created.id}/audio`, {
     headers: { Range: "bytes=0-43" },
   });
