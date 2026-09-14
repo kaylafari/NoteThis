@@ -162,4 +162,26 @@ describe('call recorder source integrity', () => {
     recorder.dispose();
     expect(microphone.getTracks().every(track => track.stopped)).toBe(true);
   });
+
+  it('releases all inputs and the audio graph when the encoder cannot start', async () => {
+    vi.spyOn(Encoder.prototype, 'start').mockImplementation(() => { throw new Error('Encoder unavailable'); });
+    const recorder = createCallRecorder();
+    await expect(recorder.start()).rejects.toThrow('Encoder unavailable');
+    expect(display.getTracks().every(track => track.stopped)).toBe(true);
+    expect(microphone.getTracks().every(track => track.stopped)).toBe(true);
+    expect(contexts[0].close).toHaveBeenCalledOnce();
+    expect(recorder.state).toBe('idle');
+  });
+
+  it('recovers existing bytes and releases inputs if the encoder throws on stop', async () => {
+    const recorder = createCallRecorder();
+    await recorder.start();
+    encoders[0].ondataavailable?.({ data: new Blob(['recoverable audio']) });
+    vi.spyOn(encoders[0], 'stop').mockImplementation(() => { throw new Error('Encoder already stopped'); });
+    const result = await recorder.stop();
+    expect(await result.blob.text()).toBe('recoverable audio');
+    expect(display.getTracks().every(track => track.stopped)).toBe(true);
+    expect(microphone.getTracks().every(track => track.stopped)).toBe(true);
+    expect(recorder.state).toBe('idle');
+  });
 });

@@ -15,7 +15,7 @@ The speech provider list follows the [OpenClaw media support matrix](https://git
 | Groq | whisper-large-v3-turbo, whisper-large-v3 | API key | Word |
 | Deepgram | nova-3, nova-2 | API key | Word and speakers |
 | ElevenLabs | scribe_v2, scribe_v1 | API key | Word and speakers |
-| Mistral | voxtral-mini-latest | API key | Segment |
+| Mistral | voxtral-mini-latest | API key | Segment with auto language; estimated with explicit language |
 | Google | gemini-2.5-flash, gemini-2.5-pro | API key | Estimated |
 | DeepInfra | openai/whisper-large-v3-turbo, openai/whisper-large-v3 | API key | Returned timestamps, otherwise estimated |
 | OpenRouter | openai/whisper-large-v3-turbo | API key | Estimated |
@@ -23,6 +23,8 @@ The speech provider list follows the [OpenClaw media support matrix](https://git
 | xAI | grok-stt (native speech service) | API key | Word and speakers |
 
 Cloud requests normalize audio to mono 16 kHz WAV in five-minute chunks, approximately 9.6 MB each. Chunk timestamps are offset back into the original recording timeline. Chunk boundaries can split words, and detected speaker IDs are labeled per part because the app cannot establish that a provider's “speaker 0” is the same person across independent requests. Local Whisper runs as one transcription and preserves its native timestamps. Temporary cloud chunk files are removed after processing, including on failure. Original audio remains available for playback.
+
+Mistral currently does not accept timestamps together with an explicit language, so its automatic-language mode requests segment times while an explicit language uses text-only estimated alignment. Media decoders are restricted to local file and pipe protocols to prevent uploaded playlists from loading network content.
 
 The maximum supported recording is eight hours. CPU transcription can take longer than the recording duration. The server gives local transcription at least 30 minutes and up to 15 times the audio duration before cancelling a stuck process. Each cloud chunk has a ten-minute request deadline. No transcript is silently substituted if a request fails, and cloud errors omit response bodies to avoid displaying keys or account information.
 

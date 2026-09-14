@@ -73,6 +73,13 @@ describe('speech adapter wire formats', () => {
     await transcribeCloudChunk(audio, 3, { ...settings, stt: { provider: 'xai', model: 'grok-stt', language: 'en' } }, 'key');
     const [url, request] = mock.mock.calls[0]; const keys = [...(request.body as FormData).keys()]; expect(url).toBe('https://api.x.ai/v1/stt'); expect(keys.at(-1)).toBe('file'); expect(keys).not.toContain('model');
   });
+  it('uses Mistral native timestamp field only when no explicit language is supplied', async () => {
+    await transcribeCloudChunk(audio, 3, { ...settings, stt: { provider: 'mistral', model: 'voxtral-mini-latest', language: '' } }, 'key');
+    expect((mock.mock.calls[0][1].body as FormData).get('timestamp_granularities')).toBe('segment');
+    mock.mockResolvedValue(new Response(JSON.stringify({ text: 'test' })));
+    await transcribeCloudChunk(audio, 3, { ...settings, stt: { provider: 'mistral', model: 'voxtral-mini-latest', language: 'en' } }, 'key');
+    expect((mock.mock.calls[1][1].body as FormData).has('timestamp_granularities')).toBe(false);
+  });
   it('uses OpenRouter JSON/base64 audio rather than a multipart OpenAI request', async () => {
     await transcribeCloudChunk(audio, 3, { ...settings, stt: { provider: 'openrouter', model: 'openai/whisper-large-v3-turbo', language: '' } }, 'key');
     const [url, request] = mock.mock.calls[0]; expect(url).toContain('/api/v1/audio/transcriptions'); expect(JSON.parse(request.body).input_audio).toEqual({ data: 'UklGRg==', format: 'wav' });
