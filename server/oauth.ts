@@ -39,7 +39,7 @@ type Login = {
 };
 const logins = new Map<string, Login>();
 export function startOAuth(provider: string): OAuthState {
-  getStorage();
+  const loginStorage = getStorage();
   const adapter = getOAuthProvider(provider);
   if (!adapter)
     throw new Error("This provider does not support browser sign-in.");
@@ -93,9 +93,12 @@ export function startOAuth(provider: string): OAuthState {
       if (login.controller.signal.aborted) return;
       await serialize(async () => {
         if (login.controller.signal.aborted) return;
-        const saved = await getStorage().read();
-        saved[provider] = credentials;
-        await getStorage().write(saved);
+        const saved = await loginStorage.read();
+        if (login.controller.signal.aborted) return;
+        await loginStorage.write({ ...saved, [provider]: credentials });
+        // Cancellation can win while the storage write is in flight. Restore
+        // the previous connection before allowing the serialized queue onward.
+        if (login.controller.signal.aborted) await loginStorage.write(saved);
       });
       if (login.controller.signal.aborted) return;
       login.state = { id: login.state.id, provider, status: "complete" };
@@ -147,26 +150,29 @@ export function cancelOAuth(id: string): void {
   };
 }
 export async function getOAuthConnections(): Promise<string[]> {
-  const saved = await getStorage().read();
+  const selectedStorage = getStorage();
+  const saved = await selectedStorage.read();
   return getOAuthProviders()
     .filter((p) => !!saved[p.id])
     .map((p) => p.id);
 }
 export async function disconnectOAuth(provider: string): Promise<void> {
+  const selectedStorage = getStorage();
   for (const [id, login] of logins)
     if (login.state.provider === provider) cancelOAuth(id);
   await serialize(async () => {
-    const saved = await getStorage().read();
+    const saved = await selectedStorage.read();
     delete saved[provider];
-    await getStorage().write(saved);
+    await selectedStorage.write(saved);
   });
 }
 export async function getOAuthApiKey(
   provider: string,
 ): Promise<string | undefined> {
   if (!getOAuthProvider(provider)) return undefined;
+  const selectedStorage = getStorage();
   return serialize(async () => {
-    const saved = await getStorage().read();
+    const saved = await selectedStorage.read();
     if (!saved[provider]) return undefined;
     try {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -183,7 +189,7 @@ export async function getOAuthApiKey(
       if (!resolved) return undefined;
       if (resolved.newCredentials !== saved[provider]) {
         saved[provider] = resolved.newCredentials;
-        await getStorage().write(saved);
+        await selectedStorage.write(saved);
       }
       return resolved.apiKey;
     } catch {

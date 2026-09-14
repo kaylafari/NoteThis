@@ -423,6 +423,82 @@ describe("app-owned OAuth lifecycle", () => {
     await disconnectOAuth("test-oauth");
     expect(await getOAuthConnections()).not.toContain("test-oauth");
   });
+  it("does not save a login cancelled while credential storage is being read", async () => {
+    let releaseRead!: () => void;
+    let enteredRead!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      enteredRead = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    configureOAuthStorage({
+      read: async () => {
+        enteredRead();
+        await waiting;
+        return {};
+      },
+      write: async (value) => {
+        saved = value;
+      },
+    });
+    const state = startOAuth("test-oauth");
+    submitOAuthInput(state.id, "fixture-code");
+    await reading;
+    cancelOAuth(state.id);
+    releaseRead();
+    await pause();
+    expect(saved).toEqual({});
+  });
+  it("restores the previous connection when cancellation wins during a credential write", async () => {
+    const previous = {
+      access: "previous-access",
+      refresh: "previous-refresh",
+      expires: Date.now() + 60_000,
+    };
+    saved = { "test-oauth": previous };
+    let releaseWrite!: () => void;
+    let enteredWrite!: () => void;
+    let writes = 0;
+    const writing = new Promise<void>((resolve) => {
+      enteredWrite = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    configureOAuthStorage({
+      read: async () => structuredClone(saved),
+      write: async (value) => {
+        saved = structuredClone(value);
+        if (++writes === 1) {
+          enteredWrite();
+          await waiting;
+        }
+      },
+    });
+    const state = startOAuth("test-oauth");
+    submitOAuthInput(state.id, "fixture-code");
+    await writing;
+    cancelOAuth(state.id);
+    releaseWrite();
+    await pause();
+    expect(saved["test-oauth"]).toEqual(previous);
+    expect(writes).toBe(2);
+  });
+  it("keeps a pending login bound to the storage where it started", async () => {
+    const state = startOAuth("test-oauth");
+    let other: Record<string, OAuthCredentials> = {};
+    configureOAuthStorage({
+      read: async () => other,
+      write: async (value) => {
+        other = value;
+      },
+    });
+    submitOAuthInput(state.id, "fixture-code");
+    await pause();
+    expect(saved["test-oauth"].access).toBe("private-token");
+    expect(other).toEqual({});
+  });
   it("cancels pending flows and rejects empty codes", async () => {
     const state = startOAuth("test-oauth");
     expect(() => submitOAuthInput(state.id, "")).toThrow();

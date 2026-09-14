@@ -166,7 +166,9 @@ export function providerCatalog(): ProviderCatalog {
           : "oauth"
         : "api-key",
       description: oauth.has(provider)
-        ? "Browser sign-in using the pi-ai OAuth adapter used by OpenClaw."
+        ? provider === "anthropic"
+          ? "API key or browser sign-in. A saved API key takes precedence; remove it to use the browser connection."
+          : "Browser sign-in using the pi-ai OAuth adapter used by OpenClaw."
         : "Model catalog and API adapter from pi-ai, used by OpenClaw.",
     }));
   llm.sort((a, b) => {
@@ -480,11 +482,20 @@ async function requestJson(
   const raw = await response.text();
   if (raw.length > 16 * 1024 * 1024)
     throw new Error(`${provider} returned an oversized response.`);
+  let parsed: unknown;
   try {
-    return obj(JSON.parse(raw));
+    parsed = JSON.parse(raw);
   } catch {
     throw new Error(`${provider} returned an invalid JSON response.`);
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error(`${provider} returned an invalid JSON response.`);
+  const payload = obj(parsed);
+  if (payload.error)
+    throw new Error(
+      `${provider} reported a request error. Check the selected model and credentials, then try again.`,
+    );
+  return payload;
 }
 export async function transcribeCloudChunk(
   filePath: string,
@@ -493,6 +504,8 @@ export async function transcribeCloudChunk(
   key: string,
 ): Promise<Transcript> {
   const { provider, model, language } = settings.stt;
+  key = key.trim();
+  if (!key) throw new Error(`Add an API key for ${provider} in Settings.`);
   const audio = await readFile(filePath);
   const form = new FormData();
   const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
@@ -527,6 +540,7 @@ export async function transcribeCloudChunk(
     );
     const candidate = obj(arr(payload.candidates)[0]);
     const text = arr(obj(candidate.content).parts)
+      .filter((p) => !obj(p).thought)
       .map((p) => str(obj(p).text))
       .join("\n");
     if (
@@ -535,6 +549,14 @@ export async function transcribeCloudChunk(
     )
       throw new Error(
         "Google could not transcribe this recording because its content filter blocked the request.",
+      );
+    if (candidate.finishReason && candidate.finishReason !== "STOP")
+      throw new Error(
+        "Google stopped before completing the transcription. Try a shorter recording or another speech model.",
+      );
+    if (!arr(payload.candidates).length)
+      throw new Error(
+        "Google returned no transcription result. Try another speech model.",
       );
     return normalizeTranscript({ text }, duration);
   }
@@ -684,7 +706,7 @@ export async function transcribeAudio(
     }
     return normalizeTranscript(parsed, duration);
   }
-  const key = await getKey(settings.stt.provider);
+  const key = (await getKey(settings.stt.provider))?.trim();
   if (!key)
     throw new Error(
       `Add an API key for ${settings.stt.provider} in Settings. Browser LLM sign-in does not authorize speech transcription.`,
@@ -732,8 +754,9 @@ export async function transcribeAudio(
       );
       const result = await transcribeCloudChunk(chunk, length, settings, key);
       if (
-        result.timing === "estimated" ||
-        (result.timing === "segment" && timing === "word")
+        result.segments.length &&
+        (result.timing === "estimated" ||
+          (result.timing === "segment" && timing === "word"))
       )
         timing = result.timing;
       for (const s of result.segments)
@@ -837,7 +860,8 @@ export async function generateText(
       );
     return result;
   }
-  const key = (await getKey(provider)) || (await getOAuthApiKey(provider));
+  const option = providerCatalog().llm.find((entry) => entry.id === provider);
+  if (!option) throw new Error("Choose a supported language-model provider.");
   let model: Model<Api> | undefined;
   if (provider === "custom") {
     const baseUrl = validateEndpoint(settings.llm.baseUrl);
@@ -864,8 +888,17 @@ export async function generateText(
       throw new Error(
         "This model is not in the installed catalog. Choose a listed model or use a custom OpenAI-compatible server.",
       );
-    model = await getOAuthModel(model);
   }
+  // Browser-only providers must never use an unrelated API-key slot. Dual-auth
+  // providers intentionally prefer an explicitly saved API key, as Settings explains.
+  const apiKey =
+    option.auth === "oauth" ? undefined : (await getKey(provider))?.trim();
+  const oauthKey =
+    !apiKey && (option.auth === "oauth" || option.auth === "api-key-or-oauth")
+      ? await getOAuthApiKey(provider)
+      : undefined;
+  const key = apiKey || oauthKey;
+  if (oauthKey) model = await getOAuthModel(model);
   if (!key && provider !== "custom")
     throw new Error(
       `Connect ${provider} in Settings using an API key or supported browser sign-in.`,
