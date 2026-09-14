@@ -161,9 +161,11 @@ describe("call recorder source integrity", () => {
   });
 
   it("releases acquired screen and system audio when microphone permission fails", async () => {
-    getUserMedia.mockRejectedValue(new Error("Microphone permission denied"));
+    getUserMedia.mockRejectedValue(
+      new DOMException("Permission denied", "NotAllowedError"),
+    );
     await expect(createCallRecorder().start()).rejects.toThrow(
-      "Microphone permission denied",
+      "Microphone access was not granted",
     );
     expect(display.getTracks().every((track) => track.stopped)).toBe(true);
     expect(encoders).toHaveLength(0);
@@ -262,5 +264,136 @@ describe("call recorder source integrity", () => {
     expect(onError).toHaveBeenCalledOnce();
     expect(() => recorder.resume()).toThrow("disconnected");
     expect((await recorder.stop()).blob.size).toBeGreaterThan(0);
+  });
+});
+
+describe("permission request feedback", () => {
+  it("waits for the actual system request before reporting an actionable denial", async () => {
+    vi.stubGlobal("window", {
+      desktop: { isElectron: true, platform: "darwin" },
+    });
+    let deny!: (error: Error) => void;
+    getDisplayMedia.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          deny = reject;
+        }),
+    );
+    const onPermissionRequest = vi.fn();
+    const recorder = createCallRecorder({ onPermissionRequest });
+    const result = recorder.start();
+    const rejected = expect(result).rejects.toThrow(
+      /System audio.*Screen & System Audio Recording.*Cadence/,
+    );
+    expect(getDisplayMedia).toHaveBeenCalledOnce();
+    expect(onPermissionRequest.mock.calls).toEqual([["system"]]);
+    expect(recorder.state).toBe("idle");
+    expect(encoders).toHaveLength(0);
+    deny(new DOMException("Permission denied", "NotAllowedError"));
+    await rejected;
+    expect(onPermissionRequest.mock.calls).toEqual([["system"], [null]]);
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("requests the microphone on every attempt and names the macOS permission", async () => {
+    vi.stubGlobal("window", {
+      desktop: { isElectron: true, platform: "darwin" },
+    });
+    getUserMedia.mockRejectedValueOnce(
+      new DOMException("Permission denied", "NotAllowedError"),
+    );
+    const onPermissionRequest = vi.fn();
+    const recorder = createCallRecorder({ onPermissionRequest });
+    await expect(recorder.start({ includeSystem: false })).rejects.toThrow(
+      /Microphone.*Privacy & Security → Microphone.*enable Cadence/,
+    );
+    expect(onPermissionRequest.mock.calls).toEqual([["microphone"], [null]]);
+    await recorder.start({ includeSystem: false });
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(getDisplayMedia).not.toHaveBeenCalled();
+    expect(recorder.state).toBe("recording");
+    await recorder.stop();
+  });
+
+  it("requests display synchronously before microphone so the click remains active", async () => {
+    const order: string[] = [];
+    getDisplayMedia.mockImplementation(async () => {
+      order.push("system");
+      return display;
+    });
+    getUserMedia.mockImplementation(async () => {
+      order.push("microphone");
+      return microphone;
+    });
+    const recorder = createCallRecorder({
+      onPermissionRequest: (source) => order.push(String(source)),
+    });
+    const starting = recorder.start();
+    expect(order).toEqual(["system", "system"]);
+    await starting;
+    expect(order).toEqual([
+      "system",
+      "system",
+      "null",
+      "microphone",
+      "microphone",
+      "null",
+    ]);
+    await recorder.stop();
+  });
+
+  it("only requests system access when microphone is deselected", async () => {
+    const onPermissionRequest = vi.fn();
+    const recorder = createCallRecorder({ onPermissionRequest });
+    await recorder.start({ includeMic: false });
+    expect(onPermissionRequest.mock.calls).toEqual([["system"], [null]]);
+    expect(getUserMedia).not.toHaveBeenCalled();
+    await recorder.stop();
+  });
+
+  it("gives browser-specific permission recovery instructions", async () => {
+    getUserMedia.mockRejectedValue(
+      new DOMException("Permission denied", "NotAllowedError"),
+    );
+    await expect(
+      createCallRecorder().start({ includeSystem: false }),
+    ).rejects.toThrow(/Microphone for this site.*browser.*site settings/);
+  });
+
+  it.each(["NotFoundError", "OverconstrainedError"])(
+    "does not label %s as a permission denial",
+    async (name) => {
+      getUserMedia.mockRejectedValue(new DOMException("Unavailable", name));
+      await expect(
+        createCallRecorder().start({ includeSystem: false }),
+      ).rejects.toThrow("Microphone source is unavailable");
+    },
+  );
+
+  it("names system capture failures without claiming the microphone was denied", async () => {
+    getDisplayMedia.mockRejectedValue(
+      new DOMException("Could not start", "NotReadableError"),
+    );
+    await expect(createCallRecorder().start()).rejects.toThrow(
+      "System audio / screen sharing could not start",
+    );
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("treats a rejected prompt after disposal as cancellation", async () => {
+    let deny!: (error: Error) => void;
+    getDisplayMedia.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          deny = reject;
+        }),
+    );
+    const recorder = createCallRecorder();
+    const result = recorder.start();
+    const rejected = expect(result).rejects.toThrow("Recording was cancelled");
+    recorder.dispose();
+    deny(new DOMException("Denied", "NotAllowedError"));
+    await rejected;
+    expect(contexts).toHaveLength(0);
   });
 });

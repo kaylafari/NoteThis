@@ -1690,7 +1690,7 @@ function ArrowUpRight() {
   return <ArrowRight size={14} className="suggestion-arrow" />;
 }
 
-function RecordingModal({
+export function RecordingModal({
   onClose,
   onSave,
   saving,
@@ -1711,6 +1711,9 @@ function RecordingModal({
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [permissionRequest, setPermissionRequest] = useState<
+    "microphone" | "system" | null
+  >(null);
   const [captured, setCaptured] = useState<{
     blob: Blob;
     mimeType: string;
@@ -1728,6 +1731,7 @@ function RecordingModal({
         }
       },
       onStateChange: setState,
+      onPermissionRequest: setPermissionRequest,
       onError: (e) => setError(e.message),
     });
     return () => {
@@ -1767,6 +1771,7 @@ function RecordingModal({
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setPermissionRequest(null);
       setStarting(false);
     }
   }
@@ -1856,6 +1861,21 @@ function RecordingModal({
                     </span>
                   </button>
                 </div>
+                {(mic || system) && !starting && (
+                  <div className="info-note" style={{ marginTop: 14 }}>
+                    <ShieldCheck size={16} />
+                    <span>
+                      Starting will request{" "}
+                      {mic && system
+                        ? "microphone and system audio / screen-sharing access"
+                        : mic
+                          ? "microphone access"
+                          : "system audio / screen-sharing access"}{" "}
+                      if needed. Approve the selected permissions in the macOS
+                      or browser prompt.
+                    </span>
+                  </div>
+                )}
                 <div className="record-info">
                   <Headphones size={18} />
                   <p>
@@ -1938,6 +1958,27 @@ function RecordingModal({
                   No system sound detected recently. If your call is playing,
                   check audio sharing and macOS permissions. Recording continues
                   normally.
+                </span>
+              </div>
+            )}
+            {permissionRequest && (
+              <div
+                className="info-note"
+                role="status"
+                aria-live="polite"
+                style={{ marginTop: 16 }}
+              >
+                <Spinner />
+                <span>
+                  <strong>
+                    {permissionRequest === "microphone"
+                      ? "Requesting microphone access…"
+                      : "Requesting system audio / screen sharing access…"}
+                  </strong>
+                  <br />
+                  {permissionRequest === "microphone"
+                    ? "Approve the microphone permission prompt from macOS or your browser."
+                    : "Approve the system audio or screen-sharing prompt. In a browser, enable audio in the sharing picker."}
                 </span>
               </div>
             )}

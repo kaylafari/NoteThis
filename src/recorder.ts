@@ -1,6 +1,9 @@
 /** Browser audio graph used by the desktop app and the browser upload/record flow. */
 export type RecorderState = "idle" | "recording" | "paused";
+export type RecordingPermissionSource = "microphone" | "system";
 export interface RecorderOptions {
+  /** Only active while a selected source is actually requesting access. */
+  onPermissionRequest?: (source: RecordingPermissionSource | null) => void;
   onLevels?: (levels: { mic: number; system: number }) => void;
   onStateChange?: (state: RecorderState) => void;
   onError?: (error: Error) => void;
@@ -19,6 +22,60 @@ export interface RecordingResult {
 
 export const SYSTEM_AUDIO_ERROR =
   "No live system-audio track was received. In the desktop app, allow System Audio Recording (and Screen Recording if requested) in macOS System Settings → Privacy & Security, then restart the app. In a browser, choose a tab with Share audio enabled, or use the desktop app to record the whole call.";
+
+/** Attach recovery instructions to the source that actually failed to open. */
+function sourceRequestError(
+  source: RecordingPermissionSource,
+  error: unknown,
+): Error {
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : String(error);
+  const label =
+    source === "microphone" ? "Microphone" : "System audio / screen sharing";
+  const desktop = typeof window !== "undefined" && window.desktop?.isElectron;
+  const mac = desktop && window.desktop?.platform === "darwin";
+  const recovery = mac
+    ? source === "microphone"
+      ? "In macOS System Settings → Privacy & Security → Microphone, enable Cadence, then quit and reopen the app. macOS does not repeat the prompt after a previous denial."
+      : "In macOS System Settings → Privacy & Security → Screen & System Audio Recording (or Screen Recording), allow Cadence to record system audio and the screen if requested, then quit and reopen the app. macOS may remember a previous denial."
+    : desktop
+      ? "Allow the selected recording source in your operating system’s privacy settings, then reopen Cadence."
+      : source === "microphone"
+        ? "Allow Microphone for this site in your browser’s site settings and allow the browser under your operating system’s microphone privacy settings, then retry."
+        : "Retry and select a tab or screen with Share audio enabled. If access is blocked, allow your browser under your operating system’s screen/system audio recording privacy settings.";
+  if (
+    ["NotAllowedError", "PermissionDeniedError", "SecurityError"].includes(
+      name,
+    ) ||
+    /permission denied/i.test(message)
+  ) {
+    return new Error(
+      `${label} access was not granted. The request was declined, canceled, or blocked by a saved permission setting. ${recovery}`,
+    );
+  }
+  if (
+    ["NotFoundError", "DevicesNotFoundError", "OverconstrainedError"].includes(
+      name,
+    )
+  ) {
+    return new Error(
+      `${label} source is unavailable. ${source === "microphone" ? "Connect or select a working microphone and retry." : "Choose an available screen or tab with audio and retry."}`,
+    );
+  }
+  if (["NotReadableError", "TrackStartError", "AbortError"].includes(name)) {
+    return new Error(
+      `${label} could not start. Another app or the operating system may be blocking capture. ${recovery}`,
+    );
+  }
+  if (name === "InvalidStateError" && source === "system") {
+    return new Error(
+      "System audio / screen sharing needs an active window. Focus Cadence and click Start recording again.",
+    );
+  }
+  return new Error(
+    `${label} could not start: ${message || "Unknown capture error"}`,
+  );
+}
 
 export function preferredRecordingMimeType(): string {
   return (
@@ -126,32 +183,51 @@ export function createCallRecorder(options: RecorderOptions = {}) {
         );
       }
     }
+    async function requestSource(
+      source: RecordingPermissionSource,
+      request: () => Promise<MediaStream>,
+    ) {
+      options.onPermissionRequest?.(source);
+      try {
+        // Invoke synchronously: display capture must keep the Start click's activation.
+        return await request();
+      } catch (error) {
+        if (run !== generation) throw new Error("Recording was cancelled.");
+        throw sourceRequestError(source, error);
+      } finally {
+        if (run === generation) options.onPermissionRequest?.(null);
+      }
+    }
     try {
       // Request display first, while the Start button's user activation is present.
       if (includeSystem) {
         if (!navigator.mediaDevices.getDisplayMedia)
           throw new Error(SYSTEM_AUDIO_ERROR);
         retain(
-          await navigator.mediaDevices.getDisplayMedia({
-            video: { width: 1, height: 1, frameRate: 1 },
-            audio: true,
-          }),
+          await requestSource("system", () =>
+            navigator.mediaDevices.getDisplayMedia({
+              video: { width: 1, height: 1, frameRate: 1 },
+              audio: true,
+            }),
+          ),
           "system",
         );
       }
       if (includeMic) {
         retain(
-          await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              ...(sources.microphoneDeviceId
-                ? { deviceId: { exact: sources.microphoneDeviceId } }
-                : {}),
-            },
-            video: false,
-          }),
+          await requestSource("microphone", () =>
+            navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                ...(sources.microphoneDeviceId
+                  ? { deviceId: { exact: sources.microphoneDeviceId } }
+                  : {}),
+              },
+              video: false,
+            }),
+          ),
           "mic",
         );
       }
