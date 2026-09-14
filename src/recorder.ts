@@ -81,7 +81,7 @@ export function createCallRecorder(options: RecorderOptions = {}) {
   function resume() {
     if (state !== "paused" || !recorder || recorder.state !== "paused") return;
     const ended = streams.some((stream) =>
-      stream.getAudioTracks().some((track) => track.readyState !== "live"),
+      stream.getTracks().some((track) => track.readyState !== "live"),
     );
     if (ended)
       throw new Error(
@@ -191,7 +191,9 @@ export function createCallRecorder(options: RecorderOptions = {}) {
           values: new Float32Array(analyser.fftSize),
         });
         nodes.push(source, gain, analyser);
-        for (const track of input.stream.getAudioTracks()) {
+        // Ending screen sharing is also a source loss, even if the browser
+        // leaves its companion audio track alive briefly.
+        for (const track of input.stream.getTracks()) {
           if (track.readyState !== "live")
             throw new Error(
               input.kind === "system"

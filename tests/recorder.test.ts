@@ -251,4 +251,16 @@ describe("call recorder source integrity", () => {
     expect(microphone.getTracks().every((track) => track.stopped)).toBe(true);
     expect(recorder.state).toBe("idle");
   });
+
+  it("pauses when screen sharing ends even if the system audio track stays live", async () => {
+    const onError = vi.fn();
+    const recorder = createCallRecorder({ onError });
+    await recorder.start();
+    display.getVideoTracks()[0].disconnectSource();
+    expect(display.getAudioTracks()[0].readyState).toBe("live");
+    expect(recorder.state).toBe("paused");
+    expect(onError).toHaveBeenCalledOnce();
+    expect(() => recorder.resume()).toThrow("disconnected");
+    expect((await recorder.stop()).blob.size).toBeGreaterThan(0);
+  });
 });
