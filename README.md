@@ -59,7 +59,7 @@ Recording is live; transcription and notes run after saving. It does not stream 
 
 Speech options match the OpenClaw batch-audio provider list checked during development: OpenAI, Groq, Deepgram, ElevenLabs, Mistral, Google Gemini, DeepInfra, OpenRouter, SenseAudio, and xAI, plus local Whisper. Provider-specific formats and timestamp capabilities are handled separately.
 
-LLM API adapters and model catalogs come from the installed `@mariozechner/pi-ai` dependency used by OpenClaw. Its installed OAuth registry exposes browser sign-in for **Anthropic, OpenAI Codex, and GitHub Copilot**. Account access, subscriptions, and provider support still apply. Choose a provider in Settings, click Sign in, open its external browser flow, and complete a callback/code prompt if requested. New credentials belong to Cadence; existing OpenClaw credentials are not read or modified.
+LLM API adapters and model catalogs come from the installed `@mariozechner/pi-ai` dependency used by OpenClaw. Its installed OAuth registry exposes browser sign-in for **Anthropic, OpenAI Codex, and GitHub Copilot**. Account access, subscriptions, and provider support still apply. Choose a provider in Settings, click Sign in, open its external browser flow, and complete a callback/code prompt if requested. New credentials belong to Cadence; existing OpenClaw credentials are not read or modified. If the browser cannot open, the sign-in panel displays the error and offers a copyable link. See [browser sign-in troubleshooting and verification](docs/browser-signin-fix.md).
 
 **LLM browser sign-in does not grant speech API access.** Cloud speech providers require an API key. Custom OpenAI-compatible servers (including LM Studio) accept a model ID and base URL. Infrastructure-specific integrations such as AWS Bedrock, Vertex, and Azure are not exposed as single-key providers.
 
@@ -84,6 +84,7 @@ npm run typecheck
 npm test             # storage, API workflow, providers, OAuth, recorder, locks
 npm run test:local    # real Whisper + Ollama pipeline on the synthetic sample
 npm run test:audio    # real Electron Web Audio/MediaRecorder synthetic two-source test
+npm run test:browser-launch # verifies native OS browser handoff; opens harmless test tabs
 npm run build        # React + desktop main/preload + local server
 npm run package      # Apple Silicon .app under release/
 ```

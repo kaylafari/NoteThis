@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { version } from "../package.json";
 
 // Only a validated web-link operation is exposed; no general shell/IPC access.
 contextBridge.exposeInMainWorld(
@@ -6,7 +7,7 @@ contextBridge.exposeInMainWorld(
   Object.freeze({
     isElectron: true,
     platform: process.platform,
-    appVersion: "0.1.0",
+    appVersion: version,
     openExternal: (url: string) =>
       ipcRenderer.invoke("cadence:open-external", url),
   }),

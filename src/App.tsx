@@ -55,6 +55,7 @@ import type {
   Segment,
 } from "../shared/types";
 import { api } from "./api";
+import { openExternalLink } from "./external-links";
 import { createCallRecorder, type RecorderState } from "./recorder";
 
 function time(value: number) {
@@ -2019,7 +2020,7 @@ function RecordingModal({
   );
 }
 
-function SettingsModal({
+export function SettingsModal({
   settings,
   catalog,
   health,
@@ -2042,69 +2043,164 @@ function SettingsModal({
   const [saved, setSaved] = useState(false);
   const [oauth, setOauth] = useState<OAuthState | null>(null);
   const [oauthInput, setOauthInput] = useState("");
+  const [authBusy, setAuthBusy] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [linkStatus, setLinkStatus] = useState("");
+  const authOperation = useRef(false);
+  const sessionId = useRef<string | null>(null);
+  const authPanel = useRef<HTMLDivElement>(null);
   const stt = catalog.stt.find(
     (provider) => provider.id === draft.stt.provider,
   );
   const llm = catalog.llm.find(
     (provider) => provider.id === draft.llm.provider,
   );
+  const pendingLogin =
+    !!oauth && (oauth.status === "pending" || oauth.status === "prompt");
+
+  function acceptOAuth(value: OAuthState) {
+    sessionId.current =
+      value.status === "complete" || value.status === "error" ? null : value.id;
+    setOauth(value);
+    if (value.status === "complete") {
+      setAuthError("");
+      setDraft((old) => ({
+        ...old,
+        oauthConnections: [
+          ...new Set([...old.oauthConnections, value.provider]),
+        ],
+      }));
+      void onRefresh().catch((e) => setAuthError((e as Error).message));
+    }
+  }
   useEffect(() => {
-    if (!oauth || oauth.status === "complete" || oauth.status === "error")
-      return;
-    const timer = setInterval(() => {
-      api
-        .oauthSession(oauth.id)
-        .then((value) => {
-          setOauth(value);
-          if (value.status === "complete") {
-            void onRefresh();
-            setDraft((old) => ({
-              ...old,
-              oauthConnections: [
-                ...new Set([...old.oauthConnections, value.provider]),
-              ],
-            }));
-          }
-        })
-        .catch((e) => setError(e.message));
+    if (!oauth || !pendingLogin) return;
+    let canceled = false;
+    let polling = false;
+    const id = oauth.id;
+    const timer = setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const value = await api.oauthSession(id);
+        if (!canceled && sessionId.current === id) acceptOAuth(value);
+      } catch (e) {
+        if (!canceled && sessionId.current === id)
+          setAuthError((e as Error).message);
+      } finally {
+        polling = false;
+      }
     }, 1600);
-    return () => clearInterval(timer);
-  }, [oauth?.id, oauth?.status]);
+    return () => {
+      canceled = true;
+      clearInterval(timer);
+    };
+  }, [oauth?.id, pendingLogin]);
+  useEffect(() => {
+    if (oauth?.url || authError)
+      authPanel.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+  }, [oauth?.url, authError]);
+
   async function save(e: FormEvent) {
     e.preventDefault();
+    if (busy || authOperation.current) return;
     setBusy(true);
     setSaved(false);
     setError("");
     try {
+      const stt = {
+        ...draft.stt,
+        model: draft.stt.model.trim(),
+        language: draft.stt.language.trim(),
+      };
+      const llm = {
+        ...draft.llm,
+        model: draft.llm.model.trim(),
+        baseUrl: draft.llm.baseUrl.trim(),
+      };
+      const local = {
+        ...draft.local,
+        pythonPath: draft.local.pythonPath.trim(),
+        ollamaUrl: draft.local.ollamaUrl.trim(),
+      };
+      if (!stt.model || !llm.model)
+        throw new Error(
+          "Choose both a speech model and a language model before saving.",
+        );
+      if (!local.pythonPath)
+        throw new Error("Enter the local Python executable path.");
+      const validateServer = (value: string, label: string) => {
+        let url: URL;
+        try {
+          url = new URL(value);
+        } catch {
+          throw new Error(`Enter a valid ${label}.`);
+        }
+        const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+          url.hostname,
+        );
+        if (
+          url.username ||
+          url.password ||
+          url.search ||
+          url.hash ||
+          !(url.protocol === "https:" || (url.protocol === "http:" && loopback))
+        )
+          throw new Error(
+            `${label} must use HTTPS, or HTTP on localhost, without embedded credentials, query parameters, or fragments.`,
+          );
+      };
+      validateServer(local.ollamaUrl, "Ollama server URL");
+      if (llm.provider === "custom")
+        validateServer(llm.baseUrl, "API base URL");
       const result = await api.saveSettings({
-        stt: draft.stt,
-        llm: draft.llm,
-        local: draft.local,
+        stt,
+        llm,
+        local,
         apiKeys: Object.fromEntries(
-          Object.entries(keys).filter(([, key]) => key.trim()),
+          Object.entries(keys)
+            .filter(([, key]) => key.trim())
+            .map(([provider, key]) => [provider, key.trim()]),
         ),
       });
       setDraft(result);
       setKeys({});
       onSave(result);
-      setSaved(true);
       await onRefresh();
+      setSaved(true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  async function connect(provider: string) {
-    setError("");
+  async function authAction(label: string, action: () => Promise<void>) {
+    if (authOperation.current || busy) return;
+    authOperation.current = true;
+    setAuthBusy(label);
+    setAuthError("");
     try {
-      const value = await api.oauth(provider);
-      setOauth(value);
+      await action();
     } catch (e) {
-      setError((e as Error).message);
+      setAuthError((e as Error).message);
+    } finally {
+      authOperation.current = false;
+      setAuthBusy("");
     }
   }
+  async function connect(provider: string) {
+    await authAction("Starting sign-in", async () => {
+      setLinkStatus("");
+      setOauthInput("");
+      acceptOAuth(await api.oauth(provider));
+    });
+  }
   async function removeKey(provider: string) {
+    if (busy || authOperation.current) return;
+    setBusy(true);
     setError("");
     try {
       const updated = await api.saveSettings({ apiKeys: { [provider]: "" } });
@@ -2117,30 +2213,169 @@ function SettingsModal({
       onSave(updated);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
   async function disconnect(provider: string) {
-    setError("");
-    try {
+    await authAction("Disconnecting", async () => {
       await api.disconnectOAuth(provider);
       setDraft((old) => ({
         ...old,
         oauthConnections: old.oauthConnections.filter((id) => id !== provider),
       }));
+      if (oauth?.provider === provider) {
+        sessionId.current = null;
+        setOauth(null);
+      }
       await onRefresh();
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    });
   }
   async function cancelLogin() {
     if (!oauth) return;
-    try {
+    await authAction("Canceling sign-in", async () => {
       await api.cancelOAuth(oauth.id);
+      sessionId.current = null;
       setOauth(null);
-    } catch (e) {
-      setError((e as Error).message);
+      setOauthInput("");
+      setLinkStatus("");
+    });
+  }
+  async function closeSettings() {
+    if (busy || authOperation.current) return;
+    if (pendingLogin && oauth) {
+      await authAction("Canceling sign-in", async () => {
+        await api.cancelOAuth(oauth.id);
+        sessionId.current = null;
+        onClose();
+      });
+    } else onClose();
+  }
+  async function launchSignIn() {
+    if (!oauth?.url) return;
+    await authAction("Opening browser", async () => {
+      setLinkStatus("");
+      await openExternalLink(oauth.url!);
+      setLinkStatus(
+        "Opened your browser. Complete sign-in there, then return here.",
+      );
+    });
+  }
+  async function copySignInLink() {
+    if (!oauth?.url) return;
+    try {
+      await navigator.clipboard.writeText(oauth.url);
+      setLinkStatus("Sign-in link copied.");
+    } catch {
+      setAuthError(
+        "Couldn’t copy automatically. Select the sign-in URL below and copy it manually.",
+      );
     }
   }
+  async function submitSignInInput() {
+    if (!oauth) return;
+    await authAction("Completing sign-in", async () => {
+      acceptOAuth(await api.oauthInput(oauth.id, oauthInput.trim()));
+      setOauthInput("");
+    });
+  }
+  const authControls = (oauth || authError || authBusy) && (
+    <div
+      className="oauth-state"
+      ref={authPanel}
+      aria-label="Browser sign-in status"
+    >
+      {pendingLogin && (
+        <button
+          type="button"
+          className="inline-link cancel-login"
+          disabled={!!authBusy || busy}
+          onClick={() => void cancelLogin()}
+        >
+          Cancel sign-in <X size={12} />
+        </button>
+      )}
+      <strong>
+        {oauth?.status === "complete"
+          ? "You’re connected."
+          : oauth?.status === "error"
+            ? "Sign-in needs attention"
+            : "Continue in your browser"}
+      </strong>
+      {oauth?.instructions && <p>{oauth.instructions}</p>}
+      {oauth?.url && pendingLogin && (
+        <>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!!authBusy || busy}
+            onClick={() => void launchSignIn()}
+          >
+            {authBusy === "Opening browser" ? (
+              <Spinner />
+            ) : (
+              <ExternalLink size={13} />
+            )}
+            Open secure sign-in
+          </button>
+          <label className="field" style={{ marginTop: 14 }}>
+            Sign-in URL
+            <input
+              aria-label="Sign-in URL"
+              readOnly
+              value={oauth.url}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </label>
+          <button
+            type="button"
+            className="inline-link"
+            onClick={() => void copySignInLink()}
+          >
+            Copy sign-in link
+          </button>
+        </>
+      )}
+      {linkStatus && <p role="status">{linkStatus}</p>}
+      {authBusy && <p role="status">{authBusy}…</p>}
+      {oauth?.status === "prompt" && (
+        <div className="oauth-input">
+          <label className="field">
+            {oauth.prompt || "Paste the authorization result"}
+            <input
+              value={oauthInput}
+              onChange={(event) => setOauthInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void submitSignInInput();
+                }
+              }}
+              disabled={!!authBusy}
+            />
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!!authBusy}
+            onClick={() => void submitSignInInput()}
+          >
+            Continue
+          </button>
+        </div>
+      )}
+      {oauth?.error && (
+        <p className="field-error" role="alert">
+          {oauth.error}
+        </p>
+      )}
+      {authError && (
+        <p className="field-error" role="alert">
+          {authError}
+        </p>
+      )}
+    </div>
+  );
   const keyProviders = [
     ...new Map(
       [stt, llm]
@@ -2154,7 +2389,7 @@ function SettingsModal({
     <Modal
       title="A workspace that sounds like you."
       subtitle="Choose where your audio and words are processed."
-      onClose={onClose}
+      onClose={() => void closeSettings()}
       wide
     >
       <div className="settings-tabs">
@@ -2173,8 +2408,12 @@ function SettingsModal({
           Local setup
         </button>
       </div>
-      <form onSubmit={save}>
-        <div className="settings-body">
+      <form onSubmit={save} onChange={() => setSaved(false)}>
+        <fieldset
+          className="settings-body"
+          disabled={busy}
+          style={{ border: 0, margin: 0, minWidth: 0 }}
+        >
           {section === "models" ? (
             <>
               <div className="settings-section">
@@ -2193,6 +2432,7 @@ function SettingsModal({
                   <label className="field">
                     Provider
                     <select
+                      aria-label="Speech provider"
                       value={draft.stt.provider}
                       onChange={(e) => {
                         const provider = catalog.stt.find(
@@ -2220,6 +2460,9 @@ function SettingsModal({
                     Model
                     <input
                       list="stt-models"
+                      aria-label="Speech model"
+                      required
+                      maxLength={200}
                       value={draft.stt.model}
                       onChange={(e) => {
                         setDraft({
@@ -2240,6 +2483,7 @@ function SettingsModal({
                 <label className="field language-field">
                   Language
                   <input
+                    maxLength={20}
                     placeholder="Auto-detect (or en, es, fr…)"
                     value={draft.stt.language}
                     onChange={(e) =>
@@ -2274,6 +2518,8 @@ function SettingsModal({
                   <label className="field">
                     Provider
                     <select
+                      aria-label="Language model provider"
+                      disabled={!!authBusy || pendingLogin}
                       value={draft.llm.provider}
                       onChange={(e) => {
                         const provider = catalog.llm.find(
@@ -2301,6 +2547,9 @@ function SettingsModal({
                     Model
                     <input
                       list="llm-models"
+                      aria-label="Language model"
+                      required
+                      maxLength={200}
                       value={draft.llm.model}
                       onChange={(e) => {
                         setDraft({
@@ -2323,6 +2572,7 @@ function SettingsModal({
                     API base URL
                     <input
                       type="url"
+                      required
                       value={draft.llm.baseUrl}
                       onChange={(e) =>
                         setDraft({
@@ -2353,6 +2603,7 @@ function SettingsModal({
                           <button
                             type="button"
                             className="inline-link"
+                            disabled={!!authBusy || pendingLogin}
                             onClick={() => void disconnect(llm.id)}
                           >
                             Disconnect
@@ -2361,11 +2612,7 @@ function SettingsModal({
                         <button
                           type="button"
                           className="button secondary"
-                          disabled={
-                            !!oauth &&
-                            (oauth.status === "pending" ||
-                              oauth.status === "prompt")
-                          }
+                          disabled={!!authBusy || pendingLogin}
                           onClick={() => void connect(llm.id)}
                         >
                           <ExternalLink size={14} />
@@ -2376,6 +2623,7 @@ function SettingsModal({
                       </div>
                     </div>
                   )}
+                {authControls}
               </div>
               {keyProviders.length > 0 && (
                 <div className="settings-section">
@@ -2512,6 +2760,12 @@ function SettingsModal({
                   </p>
                   <a
                     href="https://ollama.com/download"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void openExternalLink(
+                        "https://ollama.com/download",
+                      ).catch((error) => setError((error as Error).message));
+                    }}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -2561,69 +2815,13 @@ function SettingsModal({
               </div>
             </>
           )}
-          {oauth && (
-            <div className="oauth-state" role="status">
-              {(oauth.status === "pending" || oauth.status === "prompt") && (
-                <button
-                  type="button"
-                  className="inline-link cancel-login"
-                  onClick={() => void cancelLogin()}
-                >
-                  Cancel sign-in <X size={12} />
-                </button>
-              )}
-              <strong>
-                {oauth.status === "complete"
-                  ? "You’re connected."
-                  : oauth.status === "error"
-                    ? "Sign-in needs attention"
-                    : "Continue in your browser"}
-              </strong>
-              {oauth.instructions && <p>{oauth.instructions}</p>}
-              {oauth.url && (
-                <a
-                  className="button secondary"
-                  href={oauth.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open secure sign-in <ExternalLink size={13} />
-                </a>
-              )}
-              {oauth.status === "prompt" && (
-                <div className="oauth-input">
-                  <label className="field">
-                    {oauth.prompt || "Paste the authorization result"}
-                    <input
-                      value={oauthInput}
-                      onChange={(e) => setOauthInput(e.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="button secondary"
-                    onClick={async () => {
-                      try {
-                        setOauth(await api.oauthInput(oauth.id, oauthInput));
-                        setOauthInput("");
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
-                  >
-                    Continue
-                  </button>
-                </div>
-              )}
-              {oauth.error && <p className="field-error">{oauth.error}</p>}
-            </div>
-          )}
+          {section === "setup" && authControls}
           {error && (
             <p className="field-error" role="alert">
               {error}
             </p>
           )}
-        </div>
+        </fieldset>
         <footer className="settings-footer">
           <span>
             {saved ? (
@@ -2638,7 +2836,11 @@ function SettingsModal({
               </>
             )}
           </span>
-          <button className="button primary" type="submit" disabled={busy}>
+          <button
+            className="button primary"
+            type="submit"
+            disabled={busy || !!authBusy}
+          >
             {busy ? <Spinner /> : <Check size={15} />}Save preferences
           </button>
         </footer>

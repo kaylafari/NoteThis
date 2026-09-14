@@ -1,6 +1,6 @@
 {
   "name": "aim-meeting-notes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Local-first meeting recorder with synchronized transcripts and meeting intelligence",
@@ -14,11 +14,12 @@
     "desktop": "npm run build && node scripts/launch.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "package": "npm run build && electron-builder --mac --arm64 dir",
+    "package": "npm run build && electron-builder --mac --arm64 --dir",
     "setup:local": "node scripts/setup-local.mjs",
     "test:audio": "node scripts/test-recorder-electron.mjs",
     "format": "prettier --write src server desktop shared tests \"scripts/*.mjs\" *.json *.ts",
-    "test:local": "npm run build && node scripts/test-local.mjs"
+    "test:local": "npm run build && node scripts/test-local.mjs",
+    "test:browser-launch": "node scripts/test-browser-launch.mjs"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "latest",
