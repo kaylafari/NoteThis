@@ -11,6 +11,7 @@ Observed on September 14, 2026, on this Apple Silicon Mac running macOS 14.5. Sy
 - A real Electron Web Audio/MediaRecorder test mixed independent 220 Hz and 440 Hz sources into Opus audio. FFmpeg decoded both tones, both source meters registered activity, pause/resume worked, and input tracks were released. The test requests no microphone or system permissions.
 - A headerless WebM recording was decoded and its duration recovered. A 305-second synthetic upload was split into two provider-sized audio chunks with correctly offset mock transcription results.
 - An Apple Silicon `Cadence.app` bundle was created. Its ad-hoc signature passes `codesign --verify --deep --strict`; microphone and audio-capture usage descriptions are present. Python helper and sample assets are included outside the application archive.
+- The packaged native process started with an isolated temporary profile and served its local API successfully. Native screenshot inspection stalled in the Computer Use tool; the renderer walkthrough was completed in the browser instead. No OS recording permission was requested during this check.
 - Production dependency audit reported zero known vulnerabilities at verification time.
 - Private GitHub repository created. Implementation milestones were committed and pushed sequentially; generated models, recordings, credentials, and runtime binaries are excluded from Git.
 
