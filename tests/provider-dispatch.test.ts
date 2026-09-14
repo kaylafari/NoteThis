@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@mariozechner/pi-ai", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mariozechner/pi-ai")>()),
   complete: vi.fn(),
 }));
 import { complete } from "@mariozechner/pi-ai";
 import { configureOAuthStorage } from "../server/oauth.js";
+import { clearModelDiscoveryCache } from "../server/model-discovery.js";
 import { generateText, providerCatalog } from "../server/providers.js";
 import type { OAuthCredentials } from "@mariozechner/pi-ai/oauth";
 import type { Settings } from "../shared/types.js";
@@ -19,10 +20,26 @@ const settings: Settings = {
   configuredKeys: [],
   oauthConnections: [],
 };
+const codexToken = `e30.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "fixture-account" } })).toString("base64url")}.fixture`;
+afterEach(() => vi.unstubAllGlobals());
 const completeMock = vi.mocked(complete);
 let credentials: Record<string, OAuthCredentials>;
 beforeEach(() => {
   credentials = {};
+  clearModelDiscoveryCache();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            models: providerCatalog()
+              .llm.find((p) => p.id === "openai-codex")!
+              .models.map((slug) => ({ slug, visibility: "list" })),
+          }),
+        ),
+    ),
+  );
   configureOAuthStorage({
     read: async () => structuredClone(credentials),
     write: async (value) => {
@@ -45,7 +62,8 @@ describe("every advertised hosted language-model dispatch", () => {
       const browserOnly = option.auth === "oauth";
       if (browserOnly)
         credentials[option.id] = {
-          access: "fixture-oauth-token",
+          access:
+            option.id === "openai-codex" ? codexToken : "fixture-oauth-token",
           refresh: "fixture-refresh",
           expires: Date.now() + 60_000,
         };
@@ -66,7 +84,7 @@ describe("every advertised hosted language-model dispatch", () => {
         id: option.models[0],
       });
       expect(completeMock.mock.calls[0][2]?.apiKey).toBe(
-        browserOnly ? "fixture-oauth-token" : "fixture-api-key",
+        browserOnly ? credentials[option.id].access : "fixture-api-key",
       );
       if (browserOnly) expect(getKey).not.toHaveBeenCalled();
       else expect(getKey).toHaveBeenCalledWith(option.id);
@@ -128,7 +146,7 @@ describe("every advertised hosted language-model dispatch", () => {
       expect(completeMock).not.toHaveBeenCalled();
     },
   );
-  it("validates model selection before accessing credentials", async () => {
+  it("validates provider selection before accessing credentials", async () => {
     const getKey = vi.fn();
     await expect(
       generateText(
@@ -137,14 +155,14 @@ describe("every advertised hosted language-model dispatch", () => {
         {
           ...settings,
           llm: {
-            provider: "openai",
+            provider: "not-a-provider",
             model: "not-a-catalog-model",
             baseUrl: "",
           },
         },
         getKey,
       ),
-    ).rejects.toThrow("not in the installed catalog");
+    ).rejects.toThrow("supported language-model provider");
     expect(getKey).not.toHaveBeenCalled();
   });
   it("uses custom local servers without borrowing other providers' tokens", async () => {

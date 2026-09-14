@@ -13,6 +13,7 @@ import {
 } from "@mariozechner/pi-ai";
 import { getOAuthProviders } from "@mariozechner/pi-ai/oauth";
 import { getOAuthApiKey, getOAuthModel } from "./oauth.js";
+import { resolveDiscoveredModel } from "./model-discovery.js";
 import type {
   ProviderCatalog,
   ProviderOption,
@@ -884,10 +885,6 @@ export async function generateText(
     )
       throw new Error("Choose a supported language-model provider.");
     model = getModels(provider as KnownProvider).find((m) => m.id === modelId);
-    if (!model)
-      throw new Error(
-        "This model is not in the installed catalog. Choose a listed model or use a custom OpenAI-compatible server.",
-      );
   }
   // Browser-only providers must never use an unrelated API-key slot. Dual-auth
   // providers intentionally prefer an explicitly saved API key, as Settings explains.
@@ -898,11 +895,16 @@ export async function generateText(
       ? await getOAuthApiKey(provider)
       : undefined;
   const key = apiKey || oauthKey;
-  if (oauthKey) model = await getOAuthModel(model);
   if (!key && provider !== "custom")
     throw new Error(
       `Connect ${provider} in Settings using an API key or supported browser sign-in.`,
     );
+  if (!model || provider === "openai-codex")
+    model = await resolveDiscoveredModel(provider, modelId, settings, getKey, {
+      key,
+      oauth: !!oauthKey,
+    });
+  if (oauthKey) model = await getOAuthModel(model);
   try {
     const answer = await complete(
       model,

@@ -12,6 +12,7 @@ import type { Meeting, Health } from "../shared/types.js";
 import { acquireDataLock } from "./lock.js";
 import { Store, type SecretCodec } from "./storage.js";
 import { providerCatalog, transcribeAudio } from "./providers.js";
+import { discoverProviderModels } from "./model-discovery.js";
 import {
   configureOAuthStorage,
   getOAuthConnections,
@@ -242,6 +243,38 @@ export async function startServer(options: ServerOptions = {}) {
     return meeting;
   }
   app.get("/api/providers", (_req, res) => res.json(providerCatalog()));
+  app.post("/api/providers/:provider/models", async (req, res) => {
+    const input = z
+      .object({
+        kind: z.enum(["llm", "stt"]),
+        baseUrl: z.string().max(1000).optional(),
+        ollamaUrl: z.string().max(1000).optional(),
+        force: z.boolean().optional(),
+      })
+      .strict()
+      .parse(req.body);
+    const provider = modelSchema.parse(req.params.provider);
+    const saved = await store.getSettings();
+    const settings = {
+      ...saved,
+      llm: {
+        ...saved.llm,
+        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+      },
+      local: {
+        ...saved.local,
+        ...(input.ollamaUrl !== undefined
+          ? { ollamaUrl: input.ollamaUrl }
+          : {}),
+      },
+    };
+    res.setHeader("Cache-Control", "no-store");
+    res.json(
+      await discoverProviderModels(provider, input.kind, settings, getKey, {
+        force: input.force,
+      }),
+    );
+  });
   app.get("/api/settings", async (_req, res) =>
     res.json({
       ...(await store.getSettings()),

@@ -37,6 +37,22 @@ vi.mock("../server/oauth", () => ({
   submitOAuthInput: vi.fn(),
   disconnectOAuth: vi.fn(),
 }));
+vi.mock("../server/model-discovery", () => ({
+  discoverProviderModels: vi.fn(
+    async (provider, kind, settings, getKey, options) => {
+      await getKey(provider);
+      return {
+        provider,
+        kind,
+        models: ["account-model-new"],
+        source: "account",
+        message: "From connected account",
+        checkedAt: new Date().toISOString(),
+      };
+    },
+  ),
+}));
+import { discoverProviderModels } from "../server/model-discovery";
 import { startServer } from "../server/index";
 import { transcribeAudio } from "../server/providers";
 let dataDir: string,
@@ -229,5 +245,55 @@ describe("queued job isolation", () => {
       body: '{"text":""}',
     });
     expect(result.status).toBe(200);
+  });
+});
+
+describe("model discovery API", () => {
+  it("uses saved credentials with draft server overrides without saving or exposing secrets", async () => {
+    await request("/settings", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ apiKeys: { custom: "synthetic-private-key" } }),
+    });
+    const before = await (await request("/settings")).json();
+    const response = await request("/providers/custom/models", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        kind: "llm",
+        baseUrl: "http://localhost:1234/v1",
+        force: true,
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const result = await response.json();
+    expect(result.models).toEqual(["account-model-new"]);
+    expect(JSON.stringify(result)).not.toContain("synthetic-private-key");
+    const call = vi.mocked(discoverProviderModels).mock.calls.at(-1)!;
+    expect(call[2].llm.baseUrl).toBe("http://localhost:1234/v1");
+    expect(call[4]).toEqual({ force: true });
+    expect(await call[3]("custom")).toBe("synthetic-private-key");
+    expect((await (await request("/settings")).json()).llm).toEqual(before.llm);
+  });
+  it("rejects headerless requests and invalid discovery kinds", async () => {
+    expect(
+      (
+        await request("/providers/custom/models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "llm" }),
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request("/providers/custom/models", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ kind: "video" }),
+        })
+      ).status,
+    ).toBe(400);
   });
 });

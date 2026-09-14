@@ -3,6 +3,7 @@ import type {
   Settings,
   SettingsUpdate,
   ProviderCatalog,
+  ProviderModels,
   Health,
   OAuthState,
   ChatMessage,
@@ -57,6 +58,19 @@ export const api = {
       body: JSON.stringify({ message }),
     }),
   providers: () => request<ProviderCatalog>("/providers"),
+  providerModels: (
+    provider: string,
+    options: {
+      kind: "llm" | "stt";
+      baseUrl?: string;
+      ollamaUrl?: string;
+      force?: boolean;
+    },
+  ) =>
+    request<ProviderModels>(
+      `/providers/${encodeURIComponent(provider)}/models`,
+      { method: "POST", body: JSON.stringify(options) },
+    ),
   settings: () => request<Settings>("/settings"),
   saveSettings: (data: SettingsUpdate) =>
     request<Settings>("/settings", {

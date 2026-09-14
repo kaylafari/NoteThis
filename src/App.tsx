@@ -49,6 +49,7 @@ import type {
   Meeting,
   Settings,
   ProviderCatalog,
+  ProviderModels,
   Health,
   OAuthState,
   ChatMessage,
@@ -2020,6 +2021,184 @@ function RecordingModal({
   );
 }
 
+type ModelDiscovery = {
+  info: ProviderModels | null;
+  loading: boolean;
+  refresh: () => void;
+};
+function useProviderModels(
+  provider: string,
+  kind: "llm" | "stt",
+  credentials: string,
+  baseUrl = "",
+  ollamaUrl = "",
+  autoEnabled = true,
+): ModelDiscovery {
+  const key = JSON.stringify([
+    provider,
+    kind,
+    credentials,
+    baseUrl,
+    ollamaUrl,
+    autoEnabled,
+  ]);
+  const serial = useRef(0);
+  const lastCredentials = useRef(credentials);
+  const [state, setState] = useState<{
+    key: string;
+    info: ProviderModels | null;
+    loading: boolean;
+  }>({ key, info: null, loading: true });
+  const load = useCallback(
+    async (force: boolean) => {
+      const requestId = ++serial.current;
+      setState({ key, info: null, loading: true });
+      try {
+        const info = await api.providerModels(provider, {
+          kind,
+          ...(provider === "custom" ? { baseUrl } : {}),
+          ...(provider === "ollama" ? { ollamaUrl } : {}),
+          force,
+        });
+        if (requestId === serial.current) {
+          if (info.provider !== provider || info.kind !== kind)
+            throw new Error(
+              "The model response did not match the selected provider. Refresh and try again.",
+            );
+          setState({ key, info, loading: false });
+        }
+      } catch (error) {
+        if (requestId === serial.current)
+          setState({
+            key,
+            info: {
+              provider,
+              kind,
+              models: [],
+              source: "unavailable",
+              message: (error as Error).message,
+            },
+            loading: false,
+          });
+      }
+    },
+    [key, provider, kind, baseUrl, ollamaUrl],
+  );
+  useEffect(() => {
+    if (!autoEnabled) {
+      ++serial.current;
+      setState({
+        key,
+        info: {
+          provider,
+          kind,
+          source: "unavailable",
+          models: [],
+          message:
+            "Server URL changed. Refresh models to check this address, or save preferences first. Saved credentials are not sent to an edited address automatically.",
+        },
+        loading: false,
+      });
+      return;
+    }
+    const force = lastCredentials.current !== credentials;
+    lastCredentials.current = credentials;
+    // Debounce edits to local/custom server URLs; stale responses cannot cross selections.
+    const timer = setTimeout(() => void load(force), 180);
+    return () => {
+      clearTimeout(timer);
+      ++serial.current;
+    };
+  }, [load, credentials, autoEnabled, key, provider, kind]);
+  const current = state.key === key ? state : { info: null, loading: true };
+  return {
+    info: current.info,
+    loading: current.loading,
+    refresh: () => void load(true),
+  };
+}
+function ModelDiscoveryStatus({
+  discovery,
+  selected,
+  kind,
+}: {
+  discovery: ModelDiscovery;
+  selected: string;
+  kind: "llm" | "stt";
+}) {
+  const info = discovery.info;
+  const label = kind === "llm" ? "language" : "speech";
+  const missing =
+    info &&
+    (info.source === "account" || info.source === "local") &&
+    !info.models.includes(selected.trim());
+  const checked = info?.checkedAt ? new Date(info.checkedAt) : null;
+  return (
+    <div
+      className={`model-discovery ${info?.source === "unavailable" ? "model-discovery-error" : ""}`}
+      aria-label={`${label} model availability`}
+    >
+      <div className="model-discovery-heading">
+        <strong>
+          {discovery.loading
+            ? "Checking available models…"
+            : info?.source === "account"
+              ? "Account model list"
+              : info?.source === "local"
+                ? "Local model list"
+                : info?.source === "bundled"
+                  ? "Bundled suggestions · access not verified"
+                  : "Model list unavailable"}
+        </strong>
+        <button
+          type="button"
+          className="inline-link"
+          disabled={discovery.loading}
+          onClick={discovery.refresh}
+          aria-label={`Refresh ${label} models`}
+        >
+          {discovery.loading ? <Spinner /> : <Sparkles size={12} />}Refresh
+          models
+        </button>
+      </div>
+      {info?.message && (
+        <p role={info.source === "unavailable" ? "alert" : undefined}>
+          {info.message}
+        </p>
+      )}
+      {info?.source === "bundled" && (
+        <p>
+          These are bundled suggestions, not a list of models verified for your
+          account. You can enter a model ID supported by your provider.
+        </p>
+      )}
+      {info?.source === "unavailable" && (
+        <p>
+          Refresh after checking your connection or credentials. No older model
+          list is being shown; you can still enter a model ID manually.
+        </p>
+      )}
+      {missing && (
+        <p className="model-selection-warning" role="status">
+          {info.source === "account"
+            ? "The selected model is not in the current account list. Choose a listed model before saving."
+            : "The selected model is not in this local list. Install it on your server or choose an available model."}
+        </p>
+      )}
+      {checked && !Number.isNaN(checked.getTime()) && (
+        <small>
+          Checked{" "}
+          {checked.toLocaleTimeString(undefined, {
+            hour: "numeric",
+            minute: "2-digit",
+          })}{" "}
+          · {info!.models.length} models
+        </small>
+      )}
+    </div>
+  );
+}
+
 export function SettingsModal({
   settings,
   catalog,
@@ -2046,6 +2225,11 @@ export function SettingsModal({
   const [authBusy, setAuthBusy] = useState("");
   const [authError, setAuthError] = useState("");
   const [linkStatus, setLinkStatus] = useState("");
+  const [credentialRevision, setCredentialRevision] = useState(0);
+  const [savedServerUrls, setSavedServerUrls] = useState({
+    baseUrl: settings.llm.baseUrl.trim(),
+    ollamaUrl: settings.local.ollamaUrl.trim(),
+  });
   const authOperation = useRef(false);
   const sessionId = useRef<string | null>(null);
   const authPanel = useRef<HTMLDivElement>(null);
@@ -2055,6 +2239,28 @@ export function SettingsModal({
   const llm = catalog.llm.find(
     (provider) => provider.id === draft.llm.provider,
   );
+  const credentialSignal = JSON.stringify([
+    draft.configuredKeys,
+    draft.oauthConnections,
+    credentialRevision,
+  ]);
+  const speechModels = useProviderModels(
+    draft.stt.provider,
+    "stt",
+    credentialSignal,
+  );
+  const languageModels = useProviderModels(
+    draft.llm.provider,
+    "llm",
+    credentialSignal,
+    draft.llm.provider === "custom" ? draft.llm.baseUrl.trim() : "",
+    draft.llm.provider === "ollama" ? draft.local.ollamaUrl.trim() : "",
+    draft.llm.provider === "custom"
+      ? draft.llm.baseUrl.trim() === savedServerUrls.baseUrl
+      : draft.llm.provider === "ollama"
+        ? draft.local.ollamaUrl.trim() === savedServerUrls.ollamaUrl
+        : true,
+  );
   const pendingLogin =
     !!oauth && (oauth.status === "pending" || oauth.status === "prompt");
 
@@ -2063,6 +2269,7 @@ export function SettingsModal({
       value.status === "complete" || value.status === "error" ? null : value.id;
     setOauth(value);
     if (value.status === "complete") {
+      setCredentialRevision((old) => old + 1);
       setAuthError("");
       setDraft((old) => ({
         ...old,
@@ -2106,7 +2313,13 @@ export function SettingsModal({
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (busy || authOperation.current) return;
+    if (
+      busy ||
+      authOperation.current ||
+      speechModels.loading ||
+      languageModels.loading
+    )
+      return;
     setBusy(true);
     setSaved(false);
     setError("");
@@ -2130,6 +2343,18 @@ export function SettingsModal({
         throw new Error(
           "Choose both a speech model and a language model before saving.",
         );
+      for (const [discovery, model, label] of [
+        [speechModels, stt.model, "speech"],
+        [languageModels, llm.model, "language"],
+      ] as const) {
+        if (
+          discovery.info?.source === "account" &&
+          !discovery.info.models.includes(model)
+        )
+          throw new Error(
+            `Choose a ${label} model from the current account list before saving.`,
+          );
+      }
       if (!local.pythonPath)
         throw new Error("Enter the local Python executable path.");
       const validateServer = (value: string, label: string) => {
@@ -2167,6 +2392,12 @@ export function SettingsModal({
         ),
       });
       setDraft(result);
+      setSavedServerUrls({
+        baseUrl: result.llm.baseUrl.trim(),
+        ollamaUrl: result.local.ollamaUrl.trim(),
+      });
+      if (Object.values(keys).some((key) => key.trim()))
+        setCredentialRevision((old) => old + 1);
       setKeys({});
       onSave(result);
       await onRefresh();
@@ -2198,12 +2429,34 @@ export function SettingsModal({
       acceptOAuth(await api.oauth(provider));
     });
   }
+  async function saveKey(provider: string) {
+    const key = keys[provider]?.trim();
+    if (!key || busy || authOperation.current) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await api.saveSettings({ apiKeys: { [provider]: key } });
+      setDraft((old) => ({ ...old, configuredKeys: updated.configuredKeys }));
+      setKeys((old) => {
+        const next = { ...old };
+        delete next[provider];
+        return next;
+      });
+      setCredentialRevision((old) => old + 1);
+      onSave(updated);
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function removeKey(provider: string) {
     if (busy || authOperation.current) return;
     setBusy(true);
     setError("");
     try {
       const updated = await api.saveSettings({ apiKeys: { [provider]: "" } });
+      setCredentialRevision((old) => old + 1);
       setDraft((old) => ({ ...old, configuredKeys: updated.configuredKeys }));
       setKeys((old) => {
         const next = { ...old };
@@ -2220,6 +2473,7 @@ export function SettingsModal({
   async function disconnect(provider: string) {
     await authAction("Disconnecting", async () => {
       await api.disconnectOAuth(provider);
+      setCredentialRevision((old) => old + 1);
       setDraft((old) => ({
         ...old,
         oauthConnections: old.oauthConnections.filter((id) => id !== provider),
@@ -2458,28 +2712,65 @@ export function SettingsModal({
                   </label>
                   <label className="field">
                     Model
-                    <input
-                      list="stt-models"
-                      aria-label="Speech model"
-                      required
-                      maxLength={200}
-                      value={draft.stt.model}
-                      onChange={(e) => {
-                        setDraft({
-                          ...draft,
-                          stt: { ...draft.stt, model: e.target.value },
-                        });
-                        setSaved(false);
-                      }}
-                    />
+                    {speechModels.info?.source === "account" ? (
+                      <select
+                        aria-label="Speech model"
+                        value={draft.stt.model}
+                        required
+                        onChange={(event) => {
+                          setDraft({
+                            ...draft,
+                            stt: { ...draft.stt, model: event.target.value },
+                          });
+                          setSaved(false);
+                        }}
+                      >
+                        <option value="" disabled>
+                          Choose a model from your account
+                        </option>
+                        {draft.stt.model &&
+                          !speechModels.info.models.includes(
+                            draft.stt.model,
+                          ) && (
+                            <option value={draft.stt.model} disabled>
+                              {draft.stt.model} (not in current list)
+                            </option>
+                          )}
+                        {speechModels.info.models.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        list="stt-models"
+                        aria-label="Speech model"
+                        required
+                        maxLength={200}
+                        value={draft.stt.model}
+                        onChange={(e) => {
+                          setDraft({
+                            ...draft,
+                            stt: { ...draft.stt, model: e.target.value },
+                          });
+                          setSaved(false);
+                        }}
+                      />
+                    )}
                     <datalist id="stt-models">
-                      {stt?.models.map((model) => (
+                      {speechModels.info?.models.map((model) => (
                         <option value={model} key={model} />
                       ))}
                     </datalist>
                   </label>
                 </div>
                 <p className="provider-description">{stt?.description}</p>
+                <ModelDiscoveryStatus
+                  discovery={speechModels}
+                  selected={draft.stt.model}
+                  kind="stt"
+                />
                 <label className="field language-field">
                   Language
                   <input
@@ -2545,28 +2836,65 @@ export function SettingsModal({
                   </label>
                   <label className="field">
                     Model
-                    <input
-                      list="llm-models"
-                      aria-label="Language model"
-                      required
-                      maxLength={200}
-                      value={draft.llm.model}
-                      onChange={(e) => {
-                        setDraft({
-                          ...draft,
-                          llm: { ...draft.llm, model: e.target.value },
-                        });
-                        setSaved(false);
-                      }}
-                    />
+                    {languageModels.info?.source === "account" ? (
+                      <select
+                        aria-label="Language model"
+                        value={draft.llm.model}
+                        required
+                        onChange={(event) => {
+                          setDraft({
+                            ...draft,
+                            llm: { ...draft.llm, model: event.target.value },
+                          });
+                          setSaved(false);
+                        }}
+                      >
+                        <option value="" disabled>
+                          Choose a model from your account
+                        </option>
+                        {draft.llm.model &&
+                          !languageModels.info.models.includes(
+                            draft.llm.model,
+                          ) && (
+                            <option value={draft.llm.model} disabled>
+                              {draft.llm.model} (not in current list)
+                            </option>
+                          )}
+                        {languageModels.info.models.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        list="llm-models"
+                        aria-label="Language model"
+                        required
+                        maxLength={200}
+                        value={draft.llm.model}
+                        onChange={(e) => {
+                          setDraft({
+                            ...draft,
+                            llm: { ...draft.llm, model: e.target.value },
+                          });
+                          setSaved(false);
+                        }}
+                      />
+                    )}
                     <datalist id="llm-models">
-                      {llm?.models.map((model) => (
+                      {languageModels.info?.models.map((model) => (
                         <option value={model} key={model} />
                       ))}
                     </datalist>
                   </label>
                 </div>
                 <p className="provider-description">{llm?.description}</p>
+                <ModelDiscoveryStatus
+                  discovery={languageModels}
+                  selected={draft.llm.model}
+                  kind="llm"
+                />
                 {(llm?.id === "openai-compatible" || llm?.id === "custom") && (
                   <label className="field">
                     API base URL
@@ -2668,6 +2996,17 @@ export function SettingsModal({
                           setKeys({ ...keys, [provider.id]: e.target.value })
                         }
                       />
+                      <button
+                        type="button"
+                        className="inline-link"
+                        aria-label={`Save ${provider.name} API key`}
+                        disabled={
+                          busy || !!authBusy || !keys[provider.id]?.trim()
+                        }
+                        onClick={() => void saveKey(provider.id)}
+                      >
+                        Save key
+                      </button>
                     </label>
                   ))}
                 </div>
@@ -2839,7 +3178,12 @@ export function SettingsModal({
           <button
             className="button primary"
             type="submit"
-            disabled={busy || !!authBusy}
+            disabled={
+              busy ||
+              !!authBusy ||
+              speechModels.loading ||
+              languageModels.loading
+            }
           >
             {busy ? <Spinner /> : <Check size={15} />}Save preferences
           </button>

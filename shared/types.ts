@@ -80,3 +80,13 @@ export type OAuthState = {
   prompt?: string;
   error?: string;
 };
+
+export type ProviderModels = {
+  provider: string;
+  kind: "llm" | "stt";
+  models: string[];
+  source: "account" | "local" | "bundled" | "unavailable";
+  message: string;
+  checkedAt?: string;
+  defaultModel?: string;
+};

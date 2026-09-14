@@ -3578,3 +3578,57 @@ textarea::placeholder {
   color: #8d815d;
   line-height: 1.8;
 }
+
+.model-discovery {
+  margin: 12px 0 17px;
+  padding: 12px 14px;
+  border: 1px solid #dfe8d5;
+  border-radius: 7px;
+  background: #f5f8ef;
+  font-size: 10px;
+  color: #728366;
+}
+.model-discovery-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.model-discovery-heading strong {
+  font-weight: 550;
+  font-size: 10px;
+}
+.model-discovery-heading button {
+  font-size: 9px;
+  white-space: nowrap;
+}
+.model-discovery p {
+  font-size: 9px;
+  line-height: 1.8;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.model-discovery small {
+  display: block;
+  font-size: 8px;
+  color: #879878;
+  margin-top: 8px;
+}
+.model-discovery-error {
+  border-color: #eadbc5;
+  background: #fbf6ed;
+  color: #8e7959;
+}
+.model-selection-warning {
+  color: #947143;
+  font-weight: 500;
+}
+@media (max-width: 600px) {
+  .model-discovery-heading {
+    align-items: flex-start;
+  }
+  .model-discovery-heading strong {
+    line-height: 1.6;
+    max-width: 185px;
+  }
+}

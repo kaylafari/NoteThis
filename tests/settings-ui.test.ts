@@ -53,6 +53,9 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
       let closed = 0;
       let failSave = false;
       let blockPoll = false;
+      const discoveryOverrides = new Map<string, any>();
+      let deferModelsFor = "";
+      let releaseModels: ((value: any) => void) | null = null;
       let releasePoll: ((value: any) => void) | null = null;
       const wait = (ms = 15) =>
         new Promise((resolve) => setTimeout(resolve, ms));
@@ -153,6 +156,34 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
         const method = options.method || "GET";
         const body = options.body ? JSON.parse(options.body) : undefined;
         calls.push({ url, method, body });
+        if (url.startsWith("/api/providers/") && url.endsWith("/models")) {
+          const provider = decodeURIComponent(url.split("/")[3]);
+          const kind = body.kind;
+          if (deferModelsFor === provider)
+            return await new Promise((resolve) => {
+              releaseModels = (value) => resolve(response(value));
+            });
+          const entry = catalog[kind].find((item: any) => item.id === provider);
+          const connected = persisted.oauthConnections.includes(provider);
+          const models = connected
+            ? [`account-model-${sessionCounter}`]
+            : entry?.models || [];
+          return response({
+            provider,
+            kind,
+            models,
+            source: connected
+              ? "account"
+              : provider === "ollama"
+                ? "local"
+                : "bundled",
+            message: connected
+              ? "Synthetic authenticated account response"
+              : "Synthetic bundled suggestions; account access unverified",
+            checkedAt: new Date().toISOString(),
+            ...discoveryOverrides.get(`${kind}:${provider}`),
+          });
+        }
         if (url === "/api/settings" && method === "PUT") {
           if (failSave)
             return response({ error: "Synthetic save failure" }, 500);
@@ -214,6 +245,20 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
       });
       await wait(80);
 
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model availability"]')
+            ?.textContent?.includes("Local model list"),
+        "Settings opening discovers installed local models",
+      );
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="speech model availability"]')
+            ?.textContent?.includes("Bundled suggestions"),
+        "Bundled model suggestions explicitly mark unverified access",
+      );
       for (const provider of catalog.stt) {
         await set(input("Speech provider"), provider.id);
         await check(
@@ -307,9 +352,24 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
         "Invalid endpoint never reaches settings API",
       );
       await set(field("API base URL"), "http://localhost:1234/v1");
+      await check(
+        () => text().includes("Server URL changed"),
+        "Edited custom endpoint requires explicit discovery",
+      );
+      await check(
+        () =>
+          !calls.some(
+            (call) =>
+              call.url.endsWith("/models") &&
+              call.body.baseUrl === "http://localhost:1234/v1",
+          ),
+        "Edited endpoint receives no automatic credentialed lookup",
+      );
       await click("Save preferences");
       await check(
-        () => calls.at(-1)!.body.llm.baseUrl === "http://localhost:1234/v1",
+        () =>
+          calls.filter((call) => call.url === "/api/settings").at(-1)!.body.llm
+            .baseUrl === "http://localhost:1234/v1",
         "Local custom endpoint saves",
       );
       await click("Local setup");
@@ -317,11 +377,15 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
       await set(field("Ollama server URL"), "http://localhost:11435");
       await click("Save preferences");
       await check(
-        () => calls.at(-1)!.body.local.pythonPath === "/custom/python",
+        () =>
+          calls.filter((call) => call.url === "/api/settings").at(-1)!.body
+            .local.pythonPath === "/custom/python",
         "Local Python field is trimmed and saved",
       );
       await check(
-        () => calls.at(-1)!.body.local.ollamaUrl === "http://localhost:11435",
+        () =>
+          calls.filter((call) => call.url === "/api/settings").at(-1)!.body
+            .local.ollamaUrl === "http://localhost:11435",
         "Ollama endpoint saves",
       );
       await click("AI models");
@@ -414,11 +478,134 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
           text().includes("You’re connected."),
         "Input completion immediately updates connection badge",
       );
+      const discoveredModel = `account-model-${sessionCounter}`;
+      await check(
+        () =>
+          Array.from(document.querySelectorAll("#llm-models option")).some(
+            (option) => (option as HTMLOptionElement).value === discoveredModel,
+          ),
+        "OAuth completion refreshes models absent from bundled catalog",
+      );
+      await check(
+        () =>
+          input("Language model").value !== discoveredModel &&
+          text().includes("selected model is not in the current account list"),
+        "Live discovery preserves old selection and explains missing access",
+      );
+      await check(
+        () =>
+          !!document.querySelector(
+            `select[aria-label="Language model"] option[value="${discoveredModel}"]`,
+          ) && input("Language model").value !== discoveredModel,
+        "Account picker exposes new IDs while obsolete current model remains selected",
+      );
+      const beforeUnsupportedSave = calls.filter(
+        (call) => call.url === "/api/settings",
+      ).length;
+      await click("Save preferences");
+      await check(
+        () =>
+          text().includes(
+            "Choose a language model from the current account list before saving.",
+          ),
+        "Authoritative account mismatch blocks saving",
+      );
+      await check(
+        () =>
+          calls.filter((call) => call.url === "/api/settings").length ===
+          beforeUnsupportedSave,
+        "Unsupported account model is not persisted",
+      );
+      await set(input("Language model"), discoveredModel);
+      await click("Save preferences");
+      await check(
+        () => persisted.llm.model === discoveredModel,
+        "New account model ID can be saved even absent from bundled catalog",
+      );
+      discoveryOverrides.set(`llm:${oauthProvider.id}`, {
+        source: "unavailable",
+        models: [],
+        message: "Synthetic account model endpoint unavailable",
+      });
+      (
+        document.querySelector(
+          '[aria-label="Refresh language models"]',
+        ) as HTMLButtonElement
+      ).click();
+      await check(
+        () =>
+          text().includes("Synthetic account model endpoint unavailable") &&
+          document.querySelectorAll("#llm-models option").length === 0,
+        "Unavailable account refresh shows error and removes old choices",
+      );
+      await check(
+        () => input("Language model").value === discoveredModel,
+        "Unavailable discovery preserves manually selected model",
+      );
+      discoveryOverrides.set(`llm:${oauthProvider.id}`, {
+        source: "bundled",
+        models: ["fallback-suggestion"],
+        message: "No account enumeration supported",
+      });
+      (
+        document.querySelector(
+          '[aria-label="Refresh language models"]',
+        ) as HTMLButtonElement
+      ).click();
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model availability"]')
+            ?.textContent?.includes(
+              "Bundled suggestions · access not verified",
+            ),
+        "Bundled fallback never claims account entitlement",
+      );
+      await check(
+        () =>
+          Array.from(document.querySelectorAll("#llm-models option")).some(
+            (option) =>
+              (option as HTMLOptionElement).value === "fallback-suggestion",
+          ),
+        "Refresh replaces choices with explicitly marked fallback",
+      );
+      discoveryOverrides.delete(`llm:${oauthProvider.id}`);
       await click("Reconnect");
       await check(
         () => !!document.querySelector('[aria-label="Sign-in URL"]'),
         "Reconnect starts a fresh flow",
       );
+      auth = {
+        ...auth,
+        status: "prompt",
+        prompt: "Complete replacement account",
+      };
+      await until(
+        () => !!button("Continue"),
+        "Replacement account prompt arrives",
+      );
+      await click("Continue");
+      await check(
+        () =>
+          Array.from(document.querySelectorAll("#llm-models option")).some(
+            (option) =>
+              (option as HTMLOptionElement).value ===
+              `account-model-${sessionCounter}`,
+          ),
+        "Reconnecting an already-connected provider reloads the replacement account models",
+      );
+      await check(
+        () =>
+          calls
+            .filter(
+              (call) =>
+                call.url === `/api/providers/${oauthProvider.id}/models` &&
+                call.body.kind === "llm",
+            )
+            .at(-1)?.body.force === true,
+        "Same-provider OAuth reconnection bypasses cached model list",
+      );
+      await click("Reconnect");
       await click("Cancel sign-in");
       await click("Disconnect");
       await check(
@@ -427,6 +614,86 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
           !text().includes("Browser account connected"),
         "Disconnect clears connected state",
       );
+      await set(input("Speech provider"), "openai");
+      discoveryOverrides.set("stt:openai", {
+        source: "account",
+        models: ["speech-account-new"],
+        message: "Synthetic new API key account models",
+      });
+      const beforeKeyDiscovery = calls.filter(
+        (call) =>
+          call.url === "/api/providers/openai/models" &&
+          call.body.kind === "stt",
+      ).length;
+      await set(field("OpenAI"), "synthetic-replacement-key");
+      (
+        document.querySelector(
+          '[aria-label="Save OpenAI API key"]',
+        ) as HTMLButtonElement
+      ).click();
+      await check(
+        () =>
+          calls.filter(
+            (call) =>
+              call.url === "/api/providers/openai/models" &&
+              call.body.kind === "stt",
+          ).length > beforeKeyDiscovery,
+        "Replacing an already-configured API key refreshes its model list",
+      );
+      await check(
+        () =>
+          Array.from(document.querySelectorAll("#stt-models option")).some(
+            (option) =>
+              (option as HTMLOptionElement).value === "speech-account-new",
+          ),
+        "Credential refresh replaces speech suggestions with account results",
+      );
+      await check(
+        () =>
+          calls
+            .filter(
+              (call) =>
+                call.url === "/api/providers/openai/models" &&
+                call.body.kind === "stt",
+            )
+            .at(-1)?.body.force === true,
+        "Credential replacement bypasses stale discovery cache",
+      );
+      const otherProvider = catalog.llm.find(
+        (provider: any) =>
+          provider.id !== oauthProvider.id &&
+          provider.id !== "ollama" &&
+          provider.auth === "api-key",
+      );
+      deferModelsFor = otherProvider.id;
+      await set(input("Language model provider"), otherProvider.id);
+      await until(() => !!releaseModels, "Delayed provider request started");
+      await set(input("Language model provider"), "ollama");
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model availability"]')
+            ?.textContent?.includes("Local model list"),
+        "Switching providers shows newly selected provider models",
+      );
+      (releaseModels as unknown as (value: any) => void)({
+        provider: otherProvider.id,
+        kind: "llm",
+        models: ["stale-provider-model"],
+        source: "account",
+        message: "Stale delayed response",
+      });
+      await wait(30);
+      await check(
+        () =>
+          !Array.from(document.querySelectorAll("#llm-models option")).some(
+            (option) =>
+              (option as HTMLOptionElement).value === "stale-provider-model",
+          ),
+        "Late model response cannot overwrite another provider selection",
+      );
+      deferModelsFor = "";
+      await set(input("Language model provider"), oauthProvider.id);
       await click("Sign in");
       (
         document.querySelector(
