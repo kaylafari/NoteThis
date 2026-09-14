@@ -1,0 +1,6 @@
+{
+  "name": "aim-meeting-notes", "version": "0.1.0", "private": true, "type": "module", "description": "Local-first meeting recorder with synchronized transcripts and meeting intelligence", "main": "dist-desktop/main.cjs",
+  "scripts": { "dev": "concurrently -k \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"", "dev:server": "tsx watch server/index.ts", "dev:web": "vite --host 127.0.0.1", "build": "tsc --noEmit && vite build && node scripts/build-desktop.mjs", "start": "tsx server/index.ts", "desktop": "npm run build && electron .", "test": "vitest run", "typecheck": "tsc --noEmit", "package": "npm run build && electron-builder --mac dir" },
+  "dependencies": { "@mariozechner/pi-ai": "latest", "cors": "^2.8.5", "express": "^5.1.0", "lucide-react": "^0.468.0", "multer": "^2.0.2", "react": "^19.1.0", "react-dom": "^19.1.0", "zod": "^3.25.0" },
+  "devDependencies": { "@types/cors": "^2.8.17", "@types/express": "^5.0.0", "@types/multer": "^2.0.0", "@types/node": "^24.0.0", "@types/react": "^19.1.0", "@types/react-dom": "^19.1.0", "@vitejs/plugin-react": "latest", "concurrently": "^9.2.0", "electron": "latest", "electron-builder": "latest", "esbuild": "latest", "tsx": "^4.20.0", "typescript": "^5.9.0", "vite": "latest", "vitest": "latest" }
+}
