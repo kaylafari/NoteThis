@@ -12,7 +12,7 @@ import type { Meeting, Health } from '../shared/types.js';
 import { acquireDataLock } from './lock.js';
 import { Store, type SecretCodec } from './storage.js';
 import { providerCatalog, transcribeAudio } from './providers.js';
-import { configureOAuthStorage, getOAuthConnections, getOAuthState, startOAuth, submitOAuthInput, disconnectOAuth } from './oauth.js';
+import { configureOAuthStorage, getOAuthConnections, getOAuthState, startOAuth, submitOAuthInput, disconnectOAuth, cancelOAuth } from './oauth.js';
 import { summarize, answerQuestion } from './intelligence.js';
 const exec = promisify(execFile);
 export type ServerOptions = { port?: number; dataDir?: string; desktop?: boolean; staticDir?: string; secretCodec?: SecretCodec };
@@ -106,6 +106,7 @@ export async function startServer(options: ServerOptions = {}) {
   app.post('/api/oauth/:provider/start', (req, res) => res.json(startOAuth(req.params.provider)));
   app.get('/api/oauth/session/:id', (req, res) => { const state = getOAuthState(req.params.id); if (!state) return res.status(404).json({ error: 'Login session expired.' }); res.json(state); });
   app.post('/api/oauth/session/:id/input', async (req, res) => { const { text } = z.object({ text: z.string().min(1).max(8000) }).parse(req.body); await submitOAuthInput(req.params.id, text); res.json(getOAuthState(req.params.id)); });
+  app.delete('/api/oauth/session/:id', (req, res) => { cancelOAuth(req.params.id); res.json({ ok: true }); });
   app.delete('/api/oauth/:provider', async (req, res) => { await disconnectOAuth(req.params.provider); res.json({ ok: true }); });
   app.get('/api/meetings/:id/export', async (req, res) => { const m = await getMeeting(req.params.id); res.setHeader('Content-Disposition', `attachment; filename="meeting-${m.id}.md"`); res.type('text/markdown').send(`# ${m.title}\n\n${m.insight?.summary || ''}\n\n## Actions\n${m.insight?.actions.map(a => `- [${a.done ? 'x' : ' '}] ${a.text}${a.owner ? ' — ' + a.owner : ''}${a.due ? ' (' + a.due + ')' : ''}`).join('\n') || ''}\n\n## Transcript\n${m.segments.map(s => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, '0')}] ${s.text}`).join('\n\n')}`); });
   app.post('/api/demo', async (_req, res) => {

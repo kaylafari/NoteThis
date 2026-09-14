@@ -8,6 +8,11 @@ files:
   - dist-server/**
   - package.json
 extraResources:
+  - from: assets
+    to: assets
+    filter:
+      - '*.wav'
+      - '*.json'
   - from: scripts
     to: scripts
     filter:
@@ -16,6 +21,11 @@ extraResources:
 asar: true
 mac:
   category: public.app-category.productivity
+  identity: '-'
+  hardenedRuntime: true
+  entitlements: desktop/entitlements.mac.plist
+  entitlementsInherit: desktop/entitlements.mac.plist
+  notarize: false
   target:
     - target: dir
       arch:

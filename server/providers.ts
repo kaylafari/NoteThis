@@ -67,12 +67,12 @@ function runProcess(command: string, args: string[], timeout: number, progress?:
   });
 }
 export async function probeAudioDuration(filePath: string): Promise<number> {
-  const result = await runProcess('ffprobe', ['-protocol_whitelist', 'file,pipe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath], 60_000);
+  const result = await runProcess('ffprobe', ['-protocol_whitelist', 'file,pipe', '-format_whitelist', 'wav,mp3,mov,matroska,webm,ogg,flac,aac,mpeg,aiff', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath], 60_000);
   let duration = Number(result.trim());
   if (!Number.isFinite(duration) || duration <= 0) {
     // MediaRecorder WebM often lacks a duration header. Decode audio to a null sink
     // and use ffmpeg's final media clock, without writing a large temporary file.
-    const decoded = await runProcess('ffmpeg', ['-nostdin', '-protocol_whitelist', 'file,pipe', '-v', 'error', '-i', filePath, '-map', '0:a:0', '-vn', '-f', 'null', '-', '-progress', 'pipe:1', '-nostats'], 10 * 60_000);
+    const decoded = await runProcess('ffmpeg', ['-nostdin', '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'wav,mp3,mov,matroska,webm,ogg,flac,aac,mpeg,aiff', '-v', 'error', '-i', filePath, '-map', '0:a:0', '-vn', '-f', 'null', '-', '-progress', 'pipe:1', '-nostats'], 10 * 60_000);
     const clocks = [...decoded.matchAll(/^out_time_us=(\d+)$/gm)].map(m => Number(m[1]) / 1_000_000);
     duration = Math.max(0, ...clocks);
   }
@@ -184,7 +184,7 @@ export async function transcribeAudio(filePath: string, settings: Settings, getK
     for (let index = 0; index < count; index++) {
       const offset = index * 300; const length = Math.min(300, duration - offset); const chunk = path.join(work, 'chunk.wav');
       onProgress?.(`Preparing audio ${index + 1} of ${count}…`);
-      await runProcess('ffmpeg', ['-nostdin', '-protocol_whitelist', 'file,pipe', '-v', 'error', '-y', '-ss', String(offset), '-i', filePath, '-t', String(length), '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', chunk], 5 * 60_000);
+      await runProcess('ffmpeg', ['-nostdin', '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'wav,mp3,mov,matroska,webm,ogg,flac,aac,mpeg,aiff', '-v', 'error', '-y', '-ss', String(offset), '-i', filePath, '-t', String(length), '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', chunk], 5 * 60_000);
       onProgress?.(`Transcribing audio ${index + 1} of ${count} with ${settings.stt.provider}…`);
       const result = await transcribeCloudChunk(chunk, length, settings, key);
       if (result.timing === 'estimated' || (result.timing === 'segment' && timing === 'word')) timing = result.timing;

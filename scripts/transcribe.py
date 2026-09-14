@@ -26,7 +26,7 @@ def main():
     # Decode with a protocol allowlist so uploaded playlists cannot fetch URLs.
     samples = []
     resampler = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=16000)
-    with av.open(args.audio, options={"protocol_whitelist": "file,pipe"}) as container:
+    with av.open(args.audio, options={"protocol_whitelist": "file,pipe", "format_whitelist": "wav,mp3,mov,matroska,webm,ogg,flac,aac,mpeg,aiff"}) as container:
         for frame in container.decode(audio=0):
             frame.pts = None
             for converted in resampler.resample(frame):

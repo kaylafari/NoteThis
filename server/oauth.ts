@@ -41,7 +41,8 @@ export function startOAuth(provider: string): OAuthState {
     onProgress: () => { /* Some SDK progress messages contain account identifiers; keep them private. */ },
   }).then(async credentials => {
     if (login.controller.signal.aborted) return;
-    await serialize(async () => { const saved = await getStorage().read(); saved[provider] = credentials; await getStorage().write(saved); });
+    await serialize(async () => { if (login.controller.signal.aborted) return; const saved = await getStorage().read(); saved[provider] = credentials; await getStorage().write(saved); });
+    if (login.controller.signal.aborted) return;
     login.state = { id: login.state.id, provider, status: 'complete' };
   }).catch(() => {
     if (!login.controller.signal.aborted) login.state = { id: login.state.id, provider, status: 'error', error: 'Browser sign-in failed. Check your account access and try again.' };
@@ -73,7 +74,9 @@ export async function getOAuthApiKey(provider: string): Promise<string | undefin
   return serialize(async () => {
     const saved = await getStorage().read(); if (!saved[provider]) return undefined;
     try {
-      const resolved = await resolveOAuthKey(provider, saved); if (!resolved) return undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const resolved = await Promise.race([resolveOAuthKey(provider, saved), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Refresh timed out')), 45_000); timer.unref(); })]).finally(() => clearTimeout(timer));
+      if (!resolved) return undefined;
       if (resolved.newCredentials !== saved[provider]) { saved[provider] = resolved.newCredentials; await getStorage().write(saved); }
       return resolved.apiKey;
     } catch { throw new Error('Browser credentials expired or could not refresh. Reconnect this provider in Settings.'); }

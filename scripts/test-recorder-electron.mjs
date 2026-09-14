@@ -1,7 +1,7 @@
 /** Real Chromium audio/encoder integration. Uses generated signals, never devices. */
 import { build } from 'esbuild';
 import electron from 'electron';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
@@ -13,6 +13,7 @@ const scratch = await mkdtemp(path.join(os.tmpdir(), 'cadence-recorder-test-'));
 const output = path.join(scratch, 'synthetic.webm');
 const report = path.join(scratch, 'result.json');
 try {
+  await mkdir(path.join(scratch, 'profile'));
   const bundle = await build({ entryPoints: ['src/recorder.ts'], bundle: true, platform: 'browser', format: 'iife', globalName: 'CadenceRecorder', write: false });
   await writeFile(path.join(scratch, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Cadence synthetic recorder verification</title><script>${bundle.outputFiles[0].text}</script>`);
   // This isolated test does not use the production preload or the user's data.

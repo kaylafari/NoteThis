@@ -1,0 +1,378 @@
+{
+  "segments": [
+    {
+      "id": "seg-0",
+      "start": 0.0,
+      "end": 4.74,
+      "text": "Welcome to the launch planning meeting, we agreed to launch the new website on Friday,",
+      "words": [
+        {
+          "text": "Welcome",
+          "start": 0.0,
+          "end": 0.36
+        },
+        {
+          "text": "to",
+          "start": 0.36,
+          "end": 0.6
+        },
+        {
+          "text": "the",
+          "start": 0.6,
+          "end": 0.72
+        },
+        {
+          "text": "launch",
+          "start": 0.72,
+          "end": 0.98
+        },
+        {
+          "text": "planning",
+          "start": 0.98,
+          "end": 1.38
+        },
+        {
+          "text": "meeting,",
+          "start": 1.38,
+          "end": 1.8
+        },
+        {
+          "text": "we",
+          "start": 2.22,
+          "end": 2.36
+        },
+        {
+          "text": "agreed",
+          "start": 2.36,
+          "end": 2.66
+        },
+        {
+          "text": "to",
+          "start": 2.66,
+          "end": 2.88
+        },
+        {
+          "text": "launch",
+          "start": 2.88,
+          "end": 3.12
+        },
+        {
+          "text": "the",
+          "start": 3.12,
+          "end": 3.36
+        },
+        {
+          "text": "new",
+          "start": 3.36,
+          "end": 3.54
+        },
+        {
+          "text": "website",
+          "start": 3.54,
+          "end": 4.0
+        },
+        {
+          "text": "on",
+          "start": 4.0,
+          "end": 4.32
+        },
+        {
+          "text": "Friday,",
+          "start": 4.32,
+          "end": 4.74
+        }
+      ]
+    },
+    {
+      "id": "seg-1",
+      "start": 5.24,
+      "end": 8.52,
+      "text": "Maya will send the final proposal to the client by Thursday.",
+      "words": [
+        {
+          "text": "Maya",
+          "start": 5.24,
+          "end": 5.48
+        },
+        {
+          "text": "will",
+          "start": 5.48,
+          "end": 5.68
+        },
+        {
+          "text": "send",
+          "start": 5.68,
+          "end": 5.92
+        },
+        {
+          "text": "the",
+          "start": 5.92,
+          "end": 6.12
+        },
+        {
+          "text": "final",
+          "start": 6.12,
+          "end": 6.48
+        },
+        {
+          "text": "proposal",
+          "start": 6.48,
+          "end": 7.02
+        },
+        {
+          "text": "to",
+          "start": 7.02,
+          "end": 7.3
+        },
+        {
+          "text": "the",
+          "start": 7.3,
+          "end": 7.42
+        },
+        {
+          "text": "client",
+          "start": 7.42,
+          "end": 7.82
+        },
+        {
+          "text": "by",
+          "start": 7.82,
+          "end": 8.08
+        },
+        {
+          "text": "Thursday.",
+          "start": 8.08,
+          "end": 8.52
+        }
+      ]
+    },
+    {
+      "id": "seg-2",
+      "start": 9.04,
+      "end": 11.74,
+      "text": "Alex will finish testing the payment flow tomorrow.",
+      "words": [
+        {
+          "text": "Alex",
+          "start": 9.04,
+          "end": 9.24
+        },
+        {
+          "text": "will",
+          "start": 9.24,
+          "end": 9.5
+        },
+        {
+          "text": "finish",
+          "start": 9.5,
+          "end": 9.8
+        },
+        {
+          "text": "testing",
+          "start": 9.8,
+          "end": 10.32
+        },
+        {
+          "text": "the",
+          "start": 10.32,
+          "end": 10.56
+        },
+        {
+          "text": "payment",
+          "start": 10.56,
+          "end": 10.88
+        },
+        {
+          "text": "flow",
+          "start": 10.88,
+          "end": 11.24
+        },
+        {
+          "text": "tomorrow.",
+          "start": 11.24,
+          "end": 11.74
+        }
+      ]
+    },
+    {
+      "id": "seg-3",
+      "start": 12.2,
+      "end": 17.76,
+      "text": "The budget is $5,000, we decided to postpone the mobile app until next month.",
+      "words": [
+        {
+          "text": "The",
+          "start": 12.2,
+          "end": 12.3
+        },
+        {
+          "text": "budget",
+          "start": 12.3,
+          "end": 12.64
+        },
+        {
+          "text": "is",
+          "start": 12.64,
+          "end": 12.82
+        },
+        {
+          "text": "$5",
+          "start": 12.82,
+          "end": 13.18
+        },
+        {
+          "text": ",000,",
+          "start": 13.18,
+          "end": 13.96
+        },
+        {
+          "text": "we",
+          "start": 14.34,
+          "end": 14.6
+        },
+        {
+          "text": "decided",
+          "start": 14.6,
+          "end": 15.1
+        },
+        {
+          "text": "to",
+          "start": 15.1,
+          "end": 15.36
+        },
+        {
+          "text": "postpone",
+          "start": 15.36,
+          "end": 15.96
+        },
+        {
+          "text": "the",
+          "start": 15.96,
+          "end": 16.1
+        },
+        {
+          "text": "mobile",
+          "start": 16.1,
+          "end": 16.4
+        },
+        {
+          "text": "app",
+          "start": 16.4,
+          "end": 16.74
+        },
+        {
+          "text": "until",
+          "start": 16.74,
+          "end": 17.0
+        },
+        {
+          "text": "next",
+          "start": 17.0,
+          "end": 17.3
+        },
+        {
+          "text": "month.",
+          "start": 17.3,
+          "end": 17.76
+        }
+      ]
+    },
+    {
+      "id": "seg-4",
+      "start": 18.16,
+      "end": 20.7,
+      "text": "Our next meeting is on Monday at 10 in the morning.",
+      "words": [
+        {
+          "text": "Our",
+          "start": 18.16,
+          "end": 18.34
+        },
+        {
+          "text": "next",
+          "start": 18.34,
+          "end": 18.54
+        },
+        {
+          "text": "meeting",
+          "start": 18.54,
+          "end": 19.02
+        },
+        {
+          "text": "is",
+          "start": 19.02,
+          "end": 19.26
+        },
+        {
+          "text": "on",
+          "start": 19.26,
+          "end": 19.42
+        },
+        {
+          "text": "Monday",
+          "start": 19.42,
+          "end": 19.74
+        },
+        {
+          "text": "at",
+          "start": 19.74,
+          "end": 19.9
+        },
+        {
+          "text": "10",
+          "start": 19.9,
+          "end": 20.12
+        },
+        {
+          "text": "in",
+          "start": 20.12,
+          "end": 20.26
+        },
+        {
+          "text": "the",
+          "start": 20.26,
+          "end": 20.38
+        },
+        {
+          "text": "morning.",
+          "start": 20.38,
+          "end": 20.7
+        }
+      ]
+    }
+  ],
+  "duration": 20.92125,
+  "timing": "word",
+  "id": "sample-template",
+  "title": "Sample \u00b7 Launch planning",
+  "createdAt": "2026-09-14T00:00:00.000Z",
+  "status": "ready",
+  "audioFile": "sample-meeting.wav",
+  "sttProvider": "local",
+  "messages": [],
+  "insight": {
+    "summary": "This synthetic sample covers a website launch planned for Friday, a $5,000 budget, and a decision to postpone the mobile app until next month. Maya will send the final proposal by Thursday, and Alex will finish payment-flow testing tomorrow. The next meeting is Monday at 10 a.m.",
+    "decisions": [
+      "Launch the new website on Friday.",
+      "Postpone the mobile app until next month."
+    ],
+    "actions": [
+      {
+        "id": "sample-action-1",
+        "text": "Send the final proposal to the client.",
+        "owner": "Maya",
+        "due": "Thursday",
+        "done": false,
+        "segmentId": "seg-1"
+      },
+      {
+        "id": "sample-action-2",
+        "text": "Finish testing the payment flow.",
+        "owner": "Alex",
+        "due": "Tomorrow",
+        "done": false,
+        "segmentId": "seg-2"
+      }
+    ]
+  }
+}
