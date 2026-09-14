@@ -11,3 +11,6 @@ release/
 __pycache__/
 .pytest_cache/
 coverage/
+.local/
+dist-server/
+.test-data/
