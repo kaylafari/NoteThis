@@ -6,6 +6,9 @@ declare global {
       readonly isElectron: true;
       readonly platform: string;
       readonly appVersion: string;
+      openExternal: (
+        url: string,
+      ) => Promise<{ ok: true } | { ok: false; error: string }>;
     };
   }
 }

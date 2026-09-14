@@ -4,11 +4,14 @@ import {
   desktopCapturer,
   dialog,
   Menu,
+  ipcMain,
   safeStorage,
   session,
   shell,
 } from "electron";
 import path from "node:path";
+import { appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
+import { launchExternal, registerExternalLinks } from "./external-links";
 import { pathToFileURL } from "node:url";
 
 app.setName("Cadence");
@@ -42,19 +45,37 @@ function isLocalApp(url: string) {
   }
 }
 
-function openExternal(url: string) {
+function logBrowserEvent(event: { event: string; host?: string }) {
   try {
-    const parsed = new URL(url);
-    if (
-      parsed.protocol === "https:" ||
-      (parsed.protocol === "http:" &&
-        ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname))
-    ) {
-      void shell.openExternal(parsed.href).catch(() => undefined);
+    const directory = app.getPath("logs");
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const file = path.join(directory, "browser.log");
+    try {
+      if (statSync(file).size > 262144) renameSync(file, file + ".previous");
+    } catch {
+      /* First event. */
     }
+    appendFileSync(
+      file,
+      JSON.stringify({ time: new Date().toISOString(), ...event }) + "\n",
+      { mode: 0o600 },
+    );
   } catch {
-    /* Disallow malformed URLs and executable URL schemes. */
+    /* Logging must not prevent browser launch. */
   }
+}
+async function openExternal(url: string) {
+  const result = await launchExternal(
+    url,
+    (value) => shell.openExternal(value),
+    logBrowserEvent,
+  );
+  if (!result.ok && mainWindow && !mainWindow.isDestroyed())
+    void dialog.showMessageBox(mainWindow, {
+      type: "error",
+      title: "Browser could not open",
+      message: result.error,
+    });
 }
 
 function configurePermissions() {
@@ -219,6 +240,15 @@ else {
         secretCodec,
       });
       origin = `http://127.0.0.1:${server!.port}`;
+      registerExternalLinks(
+        ipcMain,
+        (event) =>
+          event.sender === mainWindow?.webContents &&
+          event.senderFrame === mainWindow?.webContents.mainFrame &&
+          isLocalApp(event.senderFrame?.url || ""),
+        (url) => shell.openExternal(url),
+        logBrowserEvent,
+      );
       configurePermissions();
       Menu.setApplicationMenu(
         Menu.buildFromTemplate([
