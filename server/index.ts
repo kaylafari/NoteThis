@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { rename, rm, access, writeFile } from 'node:fs/promises';
+import { rename, rm, access, copyFile, readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Meeting, Health } from '../shared/types.js';
@@ -29,7 +29,7 @@ export async function startServer(options: ServerOptions = {}) {
     if (!allowedHosts.has(req.hostname)) return res.status(403).json({ error: 'Local requests only.' });
     const origin = req.get('origin');
     if (origin) { try { const url = new URL(origin); if (!allowedHosts.has(url.hostname) || !['http:', 'https:'].includes(url.protocol)) return res.status(403).json({ error: 'Untrusted origin.' }); } catch { return res.status(403).json({ error: 'Untrusted origin.' }); } }
-    res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; connect-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer');
     if (req.path.startsWith('/api')) { res.setHeader('Cache-Control', 'no-store'); if (!['GET', 'HEAD'].includes(req.method) && req.get('X-Meeting-App') !== '1') return res.status(403).json({ error: 'Missing application request header.' }); }
     next();
   });
@@ -46,7 +46,8 @@ export async function startServer(options: ServerOptions = {}) {
     const work = async () => {
       const settings = await store.getSettings();
       const updateProgress = (progress: string) => { meeting.progress = progress; };
-      const timer = setInterval(() => { void store.get(id).then(latest => latest && store.save({ ...latest, progress: meeting.progress })).catch(() => {}); }, 1500);
+      let progressWrite: Promise<unknown> = Promise.resolve();
+      const timer = setInterval(() => { const progress = meeting.progress; progressWrite = progressWrite.then(async () => { const latest = await store.get(id); if (latest) await store.save({ ...latest, progress }); }).catch(() => {}); }, 1500);
       try {
         if (kind === 'transcribing') {
           updateProgress('Preparing audio and transcription model');
@@ -57,7 +58,7 @@ export async function startServer(options: ServerOptions = {}) {
         }
         meeting.insight = await summarize(meeting.segments, settings, getKey, updateProgress); meeting.status = 'ready';
       } catch (error) { meeting.status = 'error'; meeting.error = safeError(error); }
-      finally { clearInterval(timer); delete meeting.progress; await store.save(meeting); busy.delete(id); }
+      finally { clearInterval(timer); await progressWrite; delete meeting.progress; await store.save(meeting); busy.delete(id); }
     };
     queue = queue.then(work, work).catch(() => { busy.delete(id); });
     return meeting;
@@ -104,6 +105,13 @@ export async function startServer(options: ServerOptions = {}) {
   app.post('/api/oauth/session/:id/input', async (req, res) => { const { text } = z.object({ text: z.string().min(1).max(8000) }).parse(req.body); await submitOAuthInput(req.params.id, text); res.json(getOAuthState(req.params.id)); });
   app.delete('/api/oauth/:provider', async (req, res) => { await disconnectOAuth(req.params.provider); res.json({ ok: true }); });
   app.get('/api/meetings/:id/export', async (req, res) => { const m = await getMeeting(req.params.id); res.setHeader('Content-Disposition', `attachment; filename="meeting-${m.id}.md"`); res.type('text/markdown').send(`# ${m.title}\n\n${m.insight?.summary || ''}\n\n## Actions\n${m.insight?.actions.map(a => `- [${a.done ? 'x' : ' '}] ${a.text}${a.owner ? ' — ' + a.owner : ''}${a.due ? ' (' + a.due + ')' : ''}`).join('\n') || ''}\n\n## Transcript\n${m.segments.map(s => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, '0')}] ${s.text}`).join('\n\n')}`); });
+  app.post('/api/demo', async (_req, res) => {
+    const assetDir = path.join(process.env.CADENCE_RESOURCE_DIR || process.cwd(), 'assets');
+    const sample = JSON.parse(await readFile(path.join(assetDir, 'sample-meeting.json'), 'utf8')) as Meeting;
+    const id = randomUUID(); const audioFile = `${id}.wav`;
+    await copyFile(path.join(assetDir, 'sample-meeting.wav'), path.join(store.audioDir, audioFile));
+    res.status(201).json(await store.save({ ...sample, id, audioFile, title: 'Sample · Launch planning', createdAt: new Date().toISOString(), messages: [] }));
+  });
   const staticDir = options.staticDir || path.resolve('dist');
   try { await access(path.join(staticDir, 'index.html')); app.use(express.static(staticDir)); app.get('/', (_req, res) => res.sendFile(path.join(staticDir, 'index.html'))); } catch {}
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found.' }));
