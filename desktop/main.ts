@@ -31,7 +31,7 @@ function openExternal(url: string) {
 function configurePermissions() {
   const ses = session.defaultSession;
   ses.setPermissionCheckHandler((contents, permission, requestingOrigin, details) => {
-    const local = contents === mainWindow?.webContents && isLocalApp(requestingOrigin);
+    const local = contents === mainWindow?.webContents && isLocalApp(requestingOrigin) && details.isMainFrame;
     if (!local) return false;
     if (permission === 'media') return details.mediaType === 'audio';
     return permission === 'display-capture';
@@ -98,7 +98,12 @@ function createWindow() {
     });
     if (response === 1) event.preventDefault();
   });
-  void win.loadURL(origin);
+  void win.loadURL(origin).catch(error => {
+    if (!win.isDestroyed()) {
+      dialog.showErrorBox('Cadence could not load', `The local application page could not be opened. Restart Cadence and try again.\n\n${error instanceof Error ? error.message : String(error)}`);
+      win.close();
+    }
+  });
 }
 
 const acquiredLock = app.requestSingleInstanceLock();
@@ -141,7 +146,16 @@ else {
       { role: 'editMenu' },
       { role: 'viewMenu' },
       { role: 'windowMenu' },
-      { role: 'help', submenu: [{ label: 'Recording and permissions help', click: () => openExternal('https://support.apple.com/guide/mac-help/control-access-to-screen-and-system-audio-recording-mchld6aa7d23/mac') }] },
+      { role: 'help', submenu: [{ label: 'Recording and permissions help', click: () => {
+        void dialog.showMessageBox({
+          type: 'info',
+          title: 'Record a meeting',
+          message: 'Choose microphone, system audio, or both. Check that each selected input meter moves before recording your call.',
+          detail: (process.platform === 'darwin'
+            ? 'In System Settings → Privacy & Security, allow Cadence to use Microphone and System Audio Recording (or Screen & System Audio Recording). Restart Cadence after changing permissions. '
+            : 'Allow microphone and system-audio recording in your operating system privacy settings. System capture availability depends on your platform. ') + 'Use headphones to reduce echo. Pause when needed, then finish and save to keep your audio and create the transcript.',
+        });
+      } }] },
     ]));
     createWindow();
     app.on('activate', () => { if (!mainWindow) createWindow(); });
