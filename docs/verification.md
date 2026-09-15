@@ -32,3 +32,11 @@ Microphone requests now call the native macOS request API and await its result. 
 The expanded renderer tests cover pending requests, retries, selected sources, partial cleanup, canceled prompts, missing devices, pause/resume, stop/save, and unsaved-recording guards. The real Chromium encoder test still decodes both generated source tones with active meters and stopped tracks. No live microphone or private call audio was captured by these checks; actual OS prompt acceptance and hardware recording remain a manual check.
 
 Final repair validation: **193 tests passed across 15 files**, including the real Electron permission preflight regression and React recording UI tests. TypeScript validation and production build passed. The native regression uses fake devices and verifies two microphone requests, denied camera access, the empty display preflight reaching its handler, and clean display cancellation without an unhandled rejection.
+
+## NoteThis rename and design — September 15, 2026
+
+The app is now NoteThis, with an original closed calligraphy pen-cap icon and a white/gray interface with restrained brown-beige accents. The home screen, synthetic meeting transcript, recording dialog, and provider settings were visually checked in the browser. Existing layout and recording/model behavior were retained. The palette audit found no green-dominant colors; representative body, sidebar, warning, and primary-button text contrasts exceed 4.5:1.
+
+All **243 tests across 17 files** and the production build pass. The native identity regression verifies the legacy startup name before Electron is ready, the NoteThis display name after readiness, unchanged data/session directories, and explicit temporary-profile support. The bundle identifier, data folder, and startup encryption identity remain stable; no credentials were read, migrated, or deleted. Live credential decryption was not exercised. Native fake-device tests retain finite timeouts sized for concurrent Electron startup.
+
+Use `Launch NoteThis.command`; existing `Launch Cadence.command` shortcuts forward to it. Quit an older running instance before opening the new app. The project/repository path remains AIMeetingNotes; existing storage and logs retain their Cadence directory names.

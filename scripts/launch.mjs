@@ -27,7 +27,7 @@ try {
       "Start Ollama to use local meeting intelligence, or choose a cloud model in Settings.",
     );
 }
-const packaged = path.join(root, "release", "mac-arm64", "Cadence.app");
+const packaged = path.join(root, "release", "mac-arm64", "NoteThis.app");
 const usePackaged = process.argv.includes("--packaged") && existsSync(packaged);
 const executable = usePackaged
   ? "/usr/bin/open"

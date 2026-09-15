@@ -11,6 +11,7 @@ import {
   systemPreferences,
 } from "electron";
 import path from "node:path";
+import { preserveDesktopIdentity, showProductName } from "./identity";
 import { appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { launchExternal, registerExternalLinks } from "./external-links";
 import { pathToFileURL } from "node:url";
@@ -22,7 +23,7 @@ import {
   type MediaPermissionDetails,
 } from "./permissions";
 
-app.setName("Cadence");
+preserveDesktopIdentity(app);
 
 // Finder launches do not inherit a shell's Homebrew PATH. Keep configured PATH
 // entries and add common install locations for ffmpeg, ffprobe and Python.
@@ -235,12 +236,12 @@ function configurePermissions() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    title: "Cadence",
+    title: "NoteThis",
     width: 1440,
     height: 960,
     minWidth: 900,
     minHeight: 650,
-    backgroundColor: "#f4f1eb",
+    backgroundColor: "#fafafa",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -271,7 +272,7 @@ function createWindow() {
     const response = dialog.showMessageBoxSync(win, {
       type: "question",
       title: "Unsaved recording",
-      message: "Close Cadence and discard the unsaved recording?",
+      message: "Close NoteThis and discard the unsaved recording?",
       detail: "Save the recording before closing to keep the audio.",
       buttons: ["Keep recording", "Discard and close"],
       defaultId: 0,
@@ -282,8 +283,8 @@ function createWindow() {
   void win.loadURL(origin).catch((error) => {
     if (!win.isDestroyed()) {
       dialog.showErrorBox(
-        "Cadence could not load",
-        `The local application page could not be opened. Restart Cadence and try again.\n\n${error instanceof Error ? error.message : String(error)}`,
+        "NoteThis could not load",
+        `The local application page could not be opened. Restart NoteThis and try again.\n\n${error instanceof Error ? error.message : String(error)}`,
       );
       win.close();
     }
@@ -302,6 +303,7 @@ else {
   void app
     .whenReady()
     .then(async () => {
+      showProductName(app);
       // Python helpers must remain real files outside the asar archive.
       process.env.CADENCE_RESOURCE_DIR = app.isPackaged
         ? process.resourcesPath
@@ -371,7 +373,7 @@ else {
                       "Choose microphone, system audio, or both. Check that each selected input meter moves before recording your call.",
                     detail:
                       (process.platform === "darwin"
-                        ? "In System Settings → Privacy & Security, allow Cadence to use Microphone and System Audio Recording (or Screen & System Audio Recording). Restart Cadence after changing permissions. "
+                        ? "In System Settings → Privacy & Security, allow NoteThis to use Microphone and System Audio Recording (or Screen & System Audio Recording). Restart NoteThis after changing permissions. "
                         : "Allow microphone and system-audio recording in your operating system privacy settings. System capture availability depends on your platform. ") +
                       "Use headphones to reduce echo. Pause when needed, then finish and save to keep your audio and create the transcript.",
                   });
@@ -387,9 +389,9 @@ else {
       });
     })
     .catch((error) => {
-      console.error("Cadence startup failed:", error);
+      console.error("NoteThis startup failed:", error);
       dialog.showErrorBox(
-        "Cadence could not start",
+        "NoteThis could not start",
         error instanceof Error ? error.message : String(error),
       );
       app.exit(1);

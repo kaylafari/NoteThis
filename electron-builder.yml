@@ -1,5 +1,5 @@
 appId: com.cadence.meetingnotes
-productName: Cadence
+productName: NoteThis
 directories:
   output: release
 files:
@@ -11,17 +11,18 @@ extraResources:
   - from: assets
     to: assets
     filter:
-      - '*.wav'
-      - '*.json'
+      - "*.wav"
+      - "*.json"
   - from: scripts
     to: scripts
     filter:
-      - '*.py'
-      - '*.txt'
+      - "*.py"
+      - "*.txt"
 asar: true
 mac:
+  icon: assets/notethis.icns
   category: public.app-category.productivity
-  identity: '-'
+  identity: "-"
   hardenedRuntime: true
   entitlements: desktop/entitlements.mac.plist
   entitlementsInherit: desktop/entitlements.mac.plist
@@ -31,9 +32,9 @@ mac:
       arch:
         - arm64
   extendInfo:
-    NSMicrophoneUsageDescription: Cadence records your microphone so your voice is included in your meeting transcript.
-    NSAudioCaptureUsageDescription: Cadence records call audio playing on your computer to transcribe and summarize your meeting.
-    NSScreenCaptureUsageDescription: Cadence accesses system audio from your screen sharing session. It saves audio only.
+    NSMicrophoneUsageDescription: NoteThis records your microphone so your voice is included in your meeting transcript.
+    NSAudioCaptureUsageDescription: NoteThis records call audio playing on your computer to transcribe and summarize your meeting.
+    NSScreenCaptureUsageDescription: NoteThis accesses system audio from your screen sharing session. It saves audio only.
 win:
   target: nsis
 linux:

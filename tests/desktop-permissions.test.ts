@@ -206,7 +206,7 @@ describe("desktop recording authorization", () => {
           const timer = setTimeout(() => {
             child.kill("SIGKILL");
             reject(new Error("Native permission probe timed out"));
-          }, 20_000);
+          }, 40_000);
           child.once("error", (error) => {
             clearTimeout(timer);
             reject(error);
@@ -241,6 +241,6 @@ describe("desktop recording authorization", () => {
         await rm(directory, { recursive: true, force: true });
       }
     },
-    30_000,
+    50_000,
   );
 });

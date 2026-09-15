@@ -30,7 +30,7 @@ const timeout = setTimeout(() => {
       JSON.stringify({ error: "probe-timeout", ...report }),
     );
   app.exit(2);
-}, 15_000);
+}, 35_000);
 
 void app
   .whenReady()
@@ -110,6 +110,8 @@ void app
       },
     );
     await win.loadURL(origin);
+    // The first fake audio device can initialize slowly when the full suite
+    // launches other Electron processes. Keep a finite per-request deadline.
     for (const kind of ["microphone", "microphone", "camera", "display"]) {
       const request =
         kind === "display"
@@ -118,10 +120,14 @@ void app
             ? "getUserMedia({audio:false,video:true})"
             : "getUserMedia({audio:true,video:false})";
       const result = (await win.webContents.executeJavaScript(
-        `Promise.race([(async()=>{try{const stream=await navigator.mediaDevices.${request};stream.getTracks().forEach(track=>track.stop());return 'success';}catch(error){return error.name;}})(),new Promise(resolve=>setTimeout(()=>resolve('request-timeout'),4000))])`,
+        `Promise.race([(async()=>{try{const stream=await navigator.mediaDevices.${request};stream.getTracks().forEach(track=>track.stop());return 'success';}catch(error){return error.name;}})(),new Promise(resolve=>setTimeout(()=>resolve('request-timeout'),10000))])`,
         true,
       )) as string;
       report.results.push({ kind, result });
+      if (result === "request-timeout")
+        throw new Error(
+          `Native ${kind} request did not settle within 10 seconds`,
+        );
     }
     clearTimeout(timeout);
     writeFileSync(output, JSON.stringify(report));
