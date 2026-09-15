@@ -42,6 +42,7 @@ import {
   Square,
   Trash2,
   Upload,
+  UserRound,
   Volume2,
   X,
 } from "lucide-react";
@@ -515,7 +516,9 @@ export default function App() {
             className="settings-nav"
             onClick={() => setShowSettings(true)}
           >
-            <span className="avatar">K</span>
+            <span className="avatar" aria-hidden="true">
+              <UserRound size={18} strokeWidth={1.7} />
+            </span>
             <span>
               <strong>Personal workspace</strong>
               <small>Settings & AI models</small>

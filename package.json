@@ -1,6 +1,6 @@
 {
   "name": "aim-meeting-notes",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Local-first meeting recorder with synchronized transcripts and meeting intelligence",
