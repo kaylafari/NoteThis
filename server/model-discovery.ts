@@ -7,6 +7,7 @@ import {
 } from "@mariozechner/pi-ai";
 import { getOAuthApiKey, getOAuthModel } from "./oauth.js";
 import { providerCatalog, validateEndpoint } from "./providers.js";
+import { discoverModelCapabilities } from "./model-capabilities.js";
 import type { ProviderModels, Settings } from "../shared/types.js";
 
 type GetKey = (provider: string) => Promise<string | undefined>;
@@ -354,6 +355,12 @@ async function discover(
       provider,
       kind,
       models,
+      capabilities: Object.fromEntries(
+        models.map((id) => [
+          id,
+          discoverModelCapabilities(provider, metadata.get(id)!),
+        ]),
+      ),
       source:
         provider === "ollama" ||
         (provider === "custom" && new URL(endpoint.url).protocol === "http:")

@@ -79,6 +79,74 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("connected model discovery", () => {
+  it("returns only normalized capabilities from the authenticated catalog", async () => {
+    connect();
+    fetchMock.mockResolvedValueOnce(
+      json({
+        models: [
+          {
+            slug: "gpt-fixture-capabilities",
+            visibility: "list",
+            priority: 0,
+            input_modalities: ["text", "image"],
+            web_search_tool_type: "text",
+            private_metadata: "must-not-leak",
+            token: "must-not-leak",
+          },
+        ],
+      }),
+    );
+    const result = await discoverProviderModels(
+      "openai-codex",
+      "llm",
+      settings,
+      key,
+    );
+    expect(result.capabilities?.["gpt-fixture-capabilities"]).toMatchObject({
+      outputModalities: null,
+      webSearch: "supported",
+    });
+    expect(Object.keys(result.capabilities || {})).toEqual(result.models);
+    expect(JSON.stringify(result)).not.toContain("must-not-leak");
+  });
+
+  it("replaces capability metadata on refresh instead of preserving old claims", async () => {
+    connect();
+    const row = {
+      slug: "gpt-fixture-capabilities",
+      visibility: "list",
+      priority: 0,
+    };
+    fetchMock.mockResolvedValueOnce(
+      json({ models: [{ ...row, web_search_tool_type: "text" }] }),
+    );
+    const first = await discoverProviderModels(
+      "openai-codex",
+      "llm",
+      settings,
+      key,
+    );
+    expect(first.capabilities?.[row.slug].webSearch).toBe("supported");
+    fetchMock.mockResolvedValueOnce(json({ models: [row] }));
+    const refreshed = await discoverProviderModels(
+      "openai-codex",
+      "llm",
+      settings,
+      key,
+      { force: true },
+    );
+    expect(refreshed.capabilities?.[row.slug]).toMatchObject({
+      outputModalities: null,
+      webSearch: "unknown",
+    });
+  });
+
+  it("does not attach verified capabilities to bundled suggestions", async () => {
+    const result = await discoverProviderModels("local", "stt", settings, key);
+    expect(result.source).toBe("bundled");
+    expect(result.capabilities).toBeUndefined();
+  });
+
   it("uses the Cadence account token and versioned Codex endpoint, includes subscription models and hides unlisted rows", async () => {
     connect();
     const result = await discoverProviderModels(

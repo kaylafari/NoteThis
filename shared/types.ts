@@ -81,6 +81,13 @@ export type OAuthState = {
   error?: string;
 };
 
+export type ModelCapabilities = {
+  /** Null means the connected provider did not report output modalities. */
+  outputModalities: string[] | null;
+  webSearch: "supported" | "unsupported" | "unknown";
+  webSearchNote?: string;
+};
+
 export type ProviderModels = {
   provider: string;
   kind: "llm" | "stt";
@@ -89,4 +96,5 @@ export type ProviderModels = {
   message: string;
   checkedAt?: string;
   defaultModel?: string;
+  capabilities?: Record<string, ModelCapabilities>;
 };

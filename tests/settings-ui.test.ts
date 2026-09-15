@@ -181,6 +181,22 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
               ? "Synthetic authenticated account response"
               : "Synthetic bundled suggestions; account access unverified",
             checkedAt: new Date().toISOString(),
+            ...(connected
+              ? {
+                  capabilities: {
+                    [`account-model-${sessionCounter}`]: {
+                      outputModalities: ["text", "audio"],
+                      webSearch: "supported",
+                      webSearchNote: "Synthetic provider search metadata",
+                    },
+                    [entry.models[0]]: {
+                      outputModalities: ["image"],
+                      webSearch: "supported",
+                      webSearchNote: "Stale catalog capability metadata",
+                    },
+                  },
+                }
+              : {}),
             ...discoveryOverrides.get(`${kind}:${provider}`),
           });
         }
@@ -258,6 +274,22 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
             .querySelector('[aria-label="speech model availability"]')
             ?.textContent?.includes("Bundled suggestions"),
         "Bundled model suggestions explicitly mark unverified access",
+      );
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          document
+            .querySelector('[aria-label="Selected model web search"]')
+            ?.textContent?.includes("Unknown (not reported)"),
+        "Missing provider capability metadata is unknown rather than inferred",
+      );
+      await check(
+        () =>
+          text().includes("Web access in Cadence: not enabled.") &&
+          text().includes("Meeting chat returns text"),
+        "Model capability display states the actual text-only, no-web app behavior",
       );
       for (const provider of catalog.stt) {
         await set(input("Speech provider"), provider.id);
@@ -499,6 +531,14 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
           ) && input("Language model").value !== discoveredModel,
         "Account picker exposes new IDs while obsolete current model remains selected",
       );
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          !text().includes("Stale catalog capability metadata"),
+        "Capabilities for a selected ID absent from the current model list are never reused",
+      );
       const beforeUnsupportedSave = calls.filter(
         (call) => call.url === "/api/settings",
       ).length;
@@ -517,6 +557,25 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
         "Unsupported account model is not persisted",
       );
       await set(input("Language model"), discoveredModel);
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("text, audio (provider-reported)"),
+        "Selecting an available model displays its provider-reported output modalities",
+      );
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="Selected model web search"]')
+            ?.textContent?.includes("Provider-supported") &&
+          text().includes("Synthetic provider search metadata"),
+        "Provider-supported web search displays its source note",
+      );
+      await check(
+        () => text().includes("Web access in Cadence: not enabled."),
+        "Provider web support never implies browsing is enabled in Cadence",
+      );
       await click("Save preferences");
       await check(
         () => persisted.llm.model === discoveredModel,
@@ -542,10 +601,25 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
         () => input("Language model").value === discoveredModel,
         "Unavailable discovery preserves manually selected model",
       );
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          !text().includes("Synthetic provider search metadata"),
+        "Unavailable discovery clears previously reported model capabilities",
+      );
       discoveryOverrides.set(`llm:${oauthProvider.id}`, {
         source: "bundled",
-        models: ["fallback-suggestion"],
+        models: ["fallback-suggestion", "no-capability-metadata"],
         message: "No account enumeration supported",
+        capabilities: {
+          "fallback-suggestion": {
+            outputModalities: ["text"],
+            webSearch: "unsupported",
+            webSearchNote: "Synthetic provider reports no search support",
+          },
+        },
       });
       (
         document.querySelector(
@@ -568,6 +642,57 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
               (option as HTMLOptionElement).value === "fallback-suggestion",
           ),
         "Refresh replaces choices with explicitly marked fallback",
+      );
+      await set(input("Language model"), "fallback-suggestion");
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="Selected model web search"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          !text().includes("Synthetic provider reports no search support"),
+        "Unexpected capabilities on a bundled response are not presented as provider verified",
+      );
+      discoveryOverrides.set(`llm:${oauthProvider.id}`, {
+        source: "account",
+        models: ["fallback-suggestion", "no-capability-metadata"],
+        message: "Synthetic live capability response",
+        capabilities: {
+          "fallback-suggestion": {
+            outputModalities: ["text"],
+            webSearch: "unsupported",
+            webSearchNote: "Synthetic provider reports no search support",
+          },
+        },
+      });
+      (
+        document.querySelector(
+          '[aria-label="Refresh language models"]',
+        ) as HTMLButtonElement
+      ).click();
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="Selected model web search"]')
+            ?.textContent?.includes("Not supported (provider-reported)") &&
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("text (provider-reported)"),
+        "Explicit negative web capability is distinct from unknown metadata",
+      );
+      await set(input("Language model"), "no-capability-metadata");
+      await check(
+        () =>
+          document
+            .querySelector('[aria-label="Selected model web search"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          document
+            .querySelector('[aria-label="language model output formats"]')
+            ?.textContent?.includes("Unknown (not reported)") &&
+          !text().includes("Synthetic provider reports no search support"),
+        "Switching to a listed model without metadata does not inherit previous capabilities",
       );
       discoveryOverrides.delete(`llm:${oauthProvider.id}`);
       await click("Reconnect");

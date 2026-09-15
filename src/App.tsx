@@ -2174,6 +2174,20 @@ function ModelDiscoveryStatus({
     (info.source === "account" || info.source === "local") &&
     !info.models.includes(selected.trim());
   const checked = info?.checkedAt ? new Date(info.checkedAt) : null;
+  const capabilities =
+    (info?.source === "account" || info?.source === "local") &&
+    info.models.includes(selected.trim())
+      ? info.capabilities?.[selected.trim()]
+      : undefined;
+  const outputFormats = capabilities?.outputModalities?.length
+    ? `${capabilities.outputModalities.join(", ")} (provider-reported)`
+    : "Unknown (not reported)";
+  const webSearch =
+    capabilities?.webSearch === "supported"
+      ? "Provider-supported"
+      : capabilities?.webSearch === "unsupported"
+        ? "Not supported (provider-reported)"
+        : "Unknown (not reported)";
   return (
     <div
       className={`model-discovery ${info?.source === "unavailable" ? "model-discovery-error" : ""}`}
@@ -2225,6 +2239,26 @@ function ModelDiscoveryStatus({
             ? "The selected model is not in the current account list. Choose a listed model before saving."
             : "The selected model is not in this local list. Install it on your server or choose an available model."}
         </p>
+      )}
+      <p aria-label={`${label} model output formats`}>
+        <strong>Output formats: </strong>
+        {outputFormats}
+      </p>
+      {kind === "llm" && (
+        <>
+          <p aria-label="Selected model web search">
+            <strong>Web search: </strong>
+            {webSearch}
+            {capabilities?.webSearchNote && (
+              <> — {capabilities.webSearchNote}</>
+            )}
+          </p>
+          <p>
+            <strong>Web access in Cadence: not enabled.</strong> Meeting chat
+            returns text and uses your transcript; selecting a model does not
+            enable web or multimodal tools in Cadence.
+          </p>
+        </>
       )}
       {checked && !Number.isNaN(checked.getTime()) && (
         <small>
