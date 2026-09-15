@@ -36,10 +36,10 @@ function sourceRequestError(
   const mac = desktop && window.desktop?.platform === "darwin";
   const recovery = mac
     ? source === "microphone"
-      ? "In macOS System Settings → Privacy & Security → Microphone, enable Cadence, then quit and reopen the app. macOS does not repeat the prompt after a previous denial."
-      : "In macOS System Settings → Privacy & Security → Screen & System Audio Recording (or Screen Recording), allow Cadence to record system audio and the screen if requested, then quit and reopen the app. macOS may remember a previous denial."
+      ? "In macOS System Settings → Privacy & Security → Microphone, enable NoteThis, then quit and reopen the app. macOS does not repeat the prompt after a previous denial."
+      : "In macOS System Settings → Privacy & Security → Screen & System Audio Recording (or Screen Recording), allow NoteThis to record system audio and the screen if requested, then quit and reopen the app. macOS may remember a previous denial."
     : desktop
-      ? "Allow the selected recording source in your operating system’s privacy settings, then reopen Cadence."
+      ? "Allow the selected recording source in your operating system’s privacy settings, then reopen NoteThis."
       : source === "microphone"
         ? "Allow Microphone for this site in your browser’s site settings and allow the browser under your operating system’s microphone privacy settings, then retry."
         : "Retry and select a tab or screen with Share audio enabled. If access is blocked, allow your browser under your operating system’s screen/system audio recording privacy settings.";
@@ -69,7 +69,7 @@ function sourceRequestError(
   }
   if (name === "InvalidStateError" && source === "system") {
     return new Error(
-      "System audio / screen sharing needs an active window. Focus Cadence and click Start recording again.",
+      "System audio / screen sharing needs an active window. Focus NoteThis and click Start recording again.",
     );
   }
   return new Error(

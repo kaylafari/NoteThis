@@ -164,7 +164,7 @@ export class Store {
     if (value.startsWith("os:")) {
       if (!this.codec)
         throw new Error(
-          "This credential is protected by the desktop app. Open Cadence desktop to use it.",
+          "This credential is protected by the desktop app. Open NoteThis desktop to use it.",
         );
       return this.codec.decrypt(value.slice(3));
     }

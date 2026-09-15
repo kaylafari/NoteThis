@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" fill="none">
+  <title>notethis</title>
+  <defs>
+    <linearGradient id="paper" x1="44" y1="24" x2="216" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F3EFE7"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#34322D" flood-opacity=".14"/>
+    </filter>
+  </defs>
+  <rect x="16" y="12" width="224" height="224" rx="49" fill="url(#paper)" filter="url(#shadow)"/>
+  <rect x="16.5" y="12.5" width="223" height="223" rx="48.5" stroke="#FFFFFF" stroke-opacity=".85"/>
+  <g transform="translate(22 19) scale(.83)">
+    <g transform="rotate(35 128 128)">
+      <path d="M97 77C97 57.67 110.43 43 127 43C143.57 43 157 57.67 157 77V192C157 198.08 152.08 203 146 203H108C101.92 203 97 198.08 97 192V77Z" fill="#353532"/>
+      <path d="M107 82C107 67 114.8 56.8 124 55" stroke="#62605A" stroke-width="3" stroke-linecap="round"/>
+      <path d="M137 62C147 62 151 66.5 151 75V139C151 146.5 147 151 143 151C139.5 151 137 148 137 144.5C137 141.3 139.5 138.5 143 138V77C143 72.5 141.3 71 137 71V62Z" fill="#DDD2BF"/>
+      <path d="M98 179H156" stroke="#DDD2BF" stroke-width="6"/>
+      <path d="M99 188H155" stroke="#68645B" stroke-width="1.8"/>
+    </g>
+  </g>
+</svg>

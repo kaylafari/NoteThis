@@ -147,7 +147,7 @@ describe("connected model discovery", () => {
     expect(result.capabilities).toBeUndefined();
   });
 
-  it("uses the Cadence account token and versioned Codex endpoint, includes subscription models and hides unlisted rows", async () => {
+  it("uses the NoteThis account token and versioned Codex endpoint, includes subscription models and hides unlisted rows", async () => {
     connect();
     const result = await discoverProviderModels(
       "openai-codex",

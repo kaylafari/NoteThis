@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <title>notethis closed fountain-pen cap</title>
+  <g transform="rotate(35 128 128)">
+    <path d="M97 77C97 57.67 110.43 43 127 43C143.57 43 157 57.67 157 77V192C157 198.08 152.08 203 146 203H108C101.92 203 97 198.08 97 192V77Z" fill="#353532"/>
+    <path d="M107 82C107 67 114.8 56.8 124 55" stroke="#62605A" stroke-width="3" stroke-linecap="round"/>
+    <path d="M137 62C147 62 151 66.5 151 75V139C151 146.5 147 151 143 151C139.5 151 137 148 137 144.5C137 141.3 139.5 138.5 143 138V77C143 72.5 141.3 71 137 71V62Z" fill="#DDD2BF"/>
+    <path d="M98 179H156" stroke="#DDD2BF" stroke-width="6"/>
+    <path d="M99 188H155" stroke="#68645B" stroke-width="1.8"/>
+  </g>
+</svg>

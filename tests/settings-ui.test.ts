@@ -287,7 +287,7 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
       );
       await check(
         () =>
-          text().includes("Web access in Cadence: not enabled.") &&
+          text().includes("Web access in NoteThis: not enabled.") &&
           text().includes("Meeting chat returns text"),
         "Model capability display states the actual text-only, no-web app behavior",
       );
@@ -573,8 +573,8 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
         "Provider-supported web search displays its source note",
       );
       await check(
-        () => text().includes("Web access in Cadence: not enabled."),
-        "Provider web support never implies browsing is enabled in Cadence",
+        () => text().includes("Web access in NoteThis: not enabled."),
+        "Provider web support never implies browsing is enabled in NoteThis",
       );
       await click("Save preferences");
       await check(

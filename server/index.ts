@@ -608,7 +608,7 @@ if (
 )
   startServer()
     .then(({ port }) =>
-      console.log(`Cadence listening at http://127.0.0.1:${port}`),
+      console.log(`NoteThis listening at http://127.0.0.1:${port}`),
     )
     .catch((error) => {
       console.error(safeError(error));

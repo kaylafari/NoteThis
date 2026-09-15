@@ -283,7 +283,7 @@ describe("permission request feedback", () => {
     const recorder = createCallRecorder({ onPermissionRequest });
     const result = recorder.start();
     const rejected = expect(result).rejects.toThrow(
-      /System audio.*Screen & System Audio Recording.*Cadence/,
+      /System audio.*Screen & System Audio Recording.*NoteThis/,
     );
     expect(getDisplayMedia).toHaveBeenCalledOnce();
     expect(onPermissionRequest.mock.calls).toEqual([["system"]]);
@@ -305,7 +305,7 @@ describe("permission request feedback", () => {
     const onPermissionRequest = vi.fn();
     const recorder = createCallRecorder({ onPermissionRequest });
     await expect(recorder.start({ includeSystem: false })).rejects.toThrow(
-      /Microphone.*Privacy & Security → Microphone.*enable Cadence/,
+      /Microphone.*Privacy & Security → Microphone.*enable NoteThis/,
     );
     expect(onPermissionRequest.mock.calls).toEqual([["microphone"], [null]]);
     await recorder.start({ includeSystem: false });

@@ -240,7 +240,7 @@ test("recording permissions stay pending until their source succeeds or rejects"
         "Microphone-only request waits before showing an outcome",
       );
       const microphoneError =
-        "Microphone permission was denied. Open macOS System Settings → Privacy & Security → Microphone and enable Cadence, then restart the app.";
+        "Microphone permission was denied. Open macOS System Settings → Privacy & Security → Microphone and enable NoteThis, then restart the app.";
       w.syntheticRecorder.deny(microphoneError);
       await check(
         () =>
@@ -316,7 +316,7 @@ test("recording permissions stay pending until their source succeeds or rejects"
         "System-only request shows pending state before any outcome",
       );
       const systemError =
-        "System audio permission was denied. Open macOS System Settings → Privacy & Security → Screen & System Audio Recording and enable Cadence, then restart the app.";
+        "System audio permission was denied. Open macOS System Settings → Privacy & Security → Screen & System Audio Recording and enable NoteThis, then restart the app.";
       w.syntheticRecorder.deny(systemError);
       await check(
         () =>

@@ -3,7 +3,7 @@ export async function openExternalLink(url: string): Promise<void> {
   if (window.desktop?.isElectron) {
     if (!window.desktop.openExternal)
       throw new Error(
-        "Restart the updated Cadence app to open your browser, or copy the sign-in link below.",
+        "Restart the updated NoteThis app to open your browser, or copy the sign-in link below.",
       );
     const result = await window.desktop.openExternal(url);
     if (!result.ok) throw new Error(result.error);

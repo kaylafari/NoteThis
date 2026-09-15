@@ -26,7 +26,7 @@ function modalities(value: unknown): string[] | null {
 /**
  * Never infer capabilities from model names, input modalities, tool calling,
  * token limits, endpoint names, or an absent flag. This function cannot enable
- * search: callers must display Cadence's own enabled/disabled state separately.
+ * search: callers must display NoteThis's own enabled/disabled state separately.
  *
  * Sources:
  * - https://openrouter.ai/openapi.json (ModelArchitecture, Parameter)
@@ -68,7 +68,7 @@ export function discoverModelCapabilities(
     }
     result.webSearch = explicit[0] ? "supported" : "unsupported";
     result.webSearchNote =
-      "Reported by an explicit provider web-search capability flag; this does not enable web search in Cadence.";
+      "Reported by an explicit provider web-search capability flag; this does not enable web search in NoteThis.";
     return result;
   }
 
@@ -82,7 +82,7 @@ export function discoverModelCapabilities(
     ) {
       result.webSearch = "supported";
       result.webSearchNote =
-        "Codex advertises a hosted web-search tool; Cadence does not enable that tool.";
+        "Codex advertises a hosted web-search tool; NoteThis does not enable that tool.";
     }
     return result;
   }
@@ -94,13 +94,13 @@ export function discoverModelCapabilities(
     ) {
       result.webSearch = "supported";
       result.webSearchNote =
-        "OpenRouter advertises web-search support for this model; Cadence does not enable web search.";
+        "OpenRouter advertises web-search support for this model; NoteThis does not enable web search.";
     } else {
       // https://openrouter.ai/docs/guides/features/plugins/web-search documents
       // its provider-wide web plugin. That does not establish native capability
-      // for this particular model or imply the plugin is active in Cadence.
+      // for this particular model or imply the plugin is active in NoteThis.
       result.webSearchNote =
-        "Model-level web search is not reported. OpenRouter offers a separate web plugin, which Cadence does not enable.";
+        "Model-level web search is not reported. OpenRouter offers a separate web plugin, which NoteThis does not enable.";
     }
   }
   return result;

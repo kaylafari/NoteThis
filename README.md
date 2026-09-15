@@ -1,12 +1,12 @@
-# Cadence · AI Meeting Notes
+# NoteThis · AI Meeting Notes
 
 A local-first desktop meeting recorder: capture microphone + computer audio, upload recordings, replay words in sync with audio, generate meeting notes and action items, and ask questions grounded in the transcript.
 
-![Cadence transcript playback](docs/workspace.jpg)
+![NoteThis transcript playback](docs/notethis-workspace.png)
 
 ## Run on this Mac
 
-Open **Launch Cadence.command** in the project folder, or:
+Open **Launch NoteThis.command** in the project folder, or:
 
 ```sh
 npm run desktop
@@ -59,7 +59,7 @@ Recording is live; transcription and notes run after saving. It does not stream 
 
 Speech options match the OpenClaw batch-audio provider list checked during development: OpenAI, Groq, Deepgram, ElevenLabs, Mistral, Google Gemini, DeepInfra, OpenRouter, SenseAudio, and xAI, plus local Whisper. Provider-specific formats and timestamp capabilities are handled separately.
 
-LLM API adapters come from the installed `@mariozechner/pi-ai` dependency used by OpenClaw. Model choices are queried from the connected account or provider where supported, with explicit labels for bundled fallback suggestions. ChatGPT subscription choices come from its authenticated Codex catalog; a refresh replaces obsolete bundled entries. See [model discovery](docs/model-discovery.md). Its installed OAuth registry exposes browser sign-in for **Anthropic, OpenAI Codex, and GitHub Copilot**. Account access, subscriptions, and provider support still apply. Choose a provider in Settings, click Sign in, open its external browser flow, and complete a callback/code prompt if requested. New credentials belong to Cadence; existing OpenClaw credentials are not read or modified. If the browser cannot open, the sign-in panel displays the error and offers a copyable link. See [browser sign-in troubleshooting and verification](docs/browser-signin-fix.md).
+LLM API adapters come from the installed `@mariozechner/pi-ai` dependency used by OpenClaw. Model choices are queried from the connected account or provider where supported, with explicit labels for bundled fallback suggestions. ChatGPT subscription choices come from its authenticated Codex catalog; a refresh replaces obsolete bundled entries. See [model discovery](docs/model-discovery.md). Its installed OAuth registry exposes browser sign-in for **Anthropic, OpenAI Codex, and GitHub Copilot**. Account access, subscriptions, and provider support still apply. Choose a provider in Settings, click Sign in, open its external browser flow, and complete a callback/code prompt if requested. New credentials belong to NoteThis; existing OpenClaw credentials are not read or modified. If the browser cannot open, the sign-in panel displays the error and offers a copyable link. See [browser sign-in troubleshooting and verification](docs/browser-signin-fix.md).
 
 **LLM browser sign-in does not grant speech API access.** Cloud speech providers require an API key. Custom OpenAI-compatible servers (including LM Studio) accept a model ID and base URL. Infrastructure-specific integrations such as AWS Bedrock, Vertex, and Azure are not exposed as single-key providers.
 
@@ -94,3 +94,7 @@ The synthetic encoder test uses generated tones, not your microphone or actual s
 Cloud providers are contract-tested with mocked responses. Actual provider billing/account access and OS microphone/system-audio permission grants need verification with your account and device. App signing/notarization for redistribution is not configured; the local build is for development/personal use.
 
 Architecture: React + TypeScript/Vite renderer; isolated Electron main/preload; localhost Express API; atomic local JSON records; Python faster-whisper bridge; Ollama and pi-ai adapters. Background jobs run sequentially to limit local model contention. See [verification notes](docs/verification.md) for the final observed checks.
+
+## NoteThis branding and existing installations
+
+NoteThis is the renamed Cadence app. The existing storage directory and application identifier are retained so saved meetings, settings, and connections remain available. Use **Launch NoteThis.command**; the old launcher forwards to it. The interface uses white, neutral gray, and restrained warm beige, with an original closed calligraphy pen-cap mark.

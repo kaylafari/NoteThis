@@ -297,7 +297,7 @@ async function discover(
   }
   if (!endpoint)
     return fallback(
-      "This connection has no supported model-list API in Cadence. Bundled suggestions are not verified account availability.",
+      "This connection has no supported model-list API in NoteThis. Bundled suggestions are not verified account availability.",
     );
   // Never persist credentials or account identifiers in the model cache.
   const scope = createHash("sha256")
@@ -474,7 +474,7 @@ export async function resolveDiscoveredModel(
       : adapters[provider];
   if (!adapter)
     throw new Error(
-      "This discovered model needs a newer provider adapter. Choose a bundled model or update Cadence.",
+      "This discovered model needs a newer provider adapter. Choose a bundled model or update NoteThis.",
     );
   const positive = (value: unknown, fallback: number) =>
     typeof value === "number" && Number.isFinite(value) && value > 0

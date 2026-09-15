@@ -30,17 +30,17 @@ export async function acquireDataLock(dataDir: string) {
         owner = JSON.parse(await readFile(lockPath, "utf8"));
       } catch {
         throw new Error(
-          "Another Cadence process is starting. Close other copies and try again.",
+          "Another NoteThis process is starting. Close other copies and try again.",
         );
       }
       if (!Number.isSafeInteger(owner.pid) || owner.pid! <= 0)
         throw new Error(
-          "The workspace lock is invalid. Close Cadence before removing app.lock from its data folder.",
+          "The workspace lock is invalid. Close NoteThis before removing app.lock from its data folder.",
         );
       try {
         process.kill(owner.pid!, 0);
         throw new Error(
-          "This workspace is open in another Cadence process. Close the other desktop app or development server first.",
+          "This workspace is open in another NoteThis process. Close the other desktop app or development server first.",
         );
       } catch (cause) {
         if ((cause as NodeJS.ErrnoException).code !== "ESRCH") throw cause;

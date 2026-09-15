@@ -421,14 +421,12 @@ export default function App() {
             e.preventDefault();
             setSelected(null);
           }}
-          aria-label="Cadence home"
+          aria-label="NoteThis home"
         >
           <span className="brand-icon">
-            <AudioLines size={23} strokeWidth={1.8} />
+            <img src="/notethis-mark.svg" alt="" width={32} height={32} />
           </span>
-          <span>
-            cadence<span className="brand-dot">.</span>
-          </span>
+          <span>NoteThis</span>
         </a>
         <div className="workspace-label">
           YOUR WORKSPACE{" "}
@@ -1561,7 +1559,7 @@ function ChatPanel({
                 ) : (
                   <>
                     <Sparkles size={12} />
-                    Cadence
+                    NoteThis
                   </>
                 )}
               </div>
@@ -2254,9 +2252,9 @@ function ModelDiscoveryStatus({
             )}
           </p>
           <p>
-            <strong>Web access in Cadence: not enabled.</strong> Meeting chat
+            <strong>Web access in NoteThis: not enabled.</strong> Meeting chat
             returns text and uses your transcript; selecting a model does not
-            enable web or multimodal tools in Cadence.
+            enable web or multimodal tools in NoteThis.
           </p>
         </>
       )}

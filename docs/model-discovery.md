@@ -1,8 +1,8 @@
 # Model discovery
 
-Cadence's original picker came from the installed pi-ai model registry. That registry describes integration defaults; it does not establish which models a connected account can currently use. Updating the registry alone would not resolve account-specific availability.
+NoteThis's original picker came from the installed pi-ai model registry. That registry describes integration defaults; it does not establish which models a connected account can currently use. Updating the registry alone would not resolve account-specific availability.
 
-The settings panel now queries the selected source using the credentials saved in Cadence. Model discovery runs on the local server; keys and subscription tokens are never returned to the renderer. The panel refreshes after connecting or changing credentials and offers a manual refresh button. It distinguishes account results, installed local models, bundled defaults, and failed discovery.
+The settings panel now queries the selected source using the credentials saved in NoteThis. Model discovery runs on the local server; keys and subscription tokens are never returned to the renderer. The panel refreshes after connecting or changing credentials and offers a manual refresh button. It distinguishes account results, installed local models, bundled defaults, and failed discovery.
 
 Live results replace the bundled suggestions. A previously selected model remains visible as a selection that needs attention when the current account no longer lists it; refresh does not silently change saved preferences. Providers without a supported listing endpoint show a labeled fallback rather than claiming account availability.
 
@@ -25,7 +25,7 @@ Additional protocol references: [OpenRouter API schema](https://openrouter.ai/op
 
 The selected model also shows output formats and provider-reported web-search support when its discovery response exposes those fields. Missing data is **Unknown (not reported)**; bundled suggestions do not establish verified capabilities. Metadata is scoped to the same credentials and refreshed alongside the model list. A removed model cannot keep displaying old capability claims.
 
-These are distinct from what Cadence enables. Meeting summaries and questions currently produce text, and Cadence does not attach a web-search tool. A provider reporting search support does not grant active web access, guarantee account entitlement to the tool, or initiate a search. No test prompts or meeting content are sent to discover capabilities.
+These are distinct from what NoteThis enables. Meeting summaries and questions currently produce text, and NoteThis does not attach a web-search tool. A provider reporting search support does not grant active web access, guarantee account entitlement to the tool, or initiate a search. No test prompts or meeting content are sent to discover capabilities.
 
 Codex's input modalities are not output modalities. Its explicit web-search tool type can establish reported search-tool support; tool calling or generic tool-search support alone cannot. OpenRouter reports output modalities in its architecture metadata and can advertise web-search configuration in supported parameters. Providers that omit these fields remain unknown rather than being guessed from model names or a static model registry.
 
