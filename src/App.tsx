@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import type {
   Meeting,
+  Insight,
   Settings,
   ProviderCatalog,
   ProviderModels,
@@ -924,6 +925,7 @@ export default function App() {
                             No explicit decisions were identified.
                           </p>
                         )}
+                        <MeetingVisuals insight={meeting.insight} />
                         <div className="summary-footer">
                           <Sparkles size={14} />
                           AI-generated notes. Check important details against
@@ -1098,6 +1100,7 @@ export default function App() {
                     }
                   }}
                   llm={settings?.llm.model}
+                  webSearchEnabled={settings?.llm.webSearch === true}
                   onSettings={() => setShowSettings(true)}
                 />
               )}
@@ -1498,12 +1501,122 @@ function NotesEmpty({
   );
 }
 
-function ChatPanel({
+function isExternalSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
+function visualSource(
+  visual: NonNullable<Insight["visuals"]>[number],
+): string | null {
+  if (!["image/png", "image/jpeg", "image/webp"].includes(visual.mimeType))
+    return null;
+  if (
+    visual.imageUrl &&
+    /^\/api\/meetings\/[a-zA-Z0-9-]+\/visuals\/[a-zA-Z0-9-]+$/.test(
+      visual.imageUrl,
+    )
+  )
+    return visual.imageUrl;
+  const dataUrl = visual.dataUrl;
+  if (!dataUrl || dataUrl.length > 30_000_000) return null;
+  const match =
+    /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+      dataUrl,
+    );
+  if (!match || match[1] !== visual.mimeType || match[2].length % 4 !== 0)
+    return null;
+  try {
+    const bytes = atob(match[2].slice(0, 64));
+    const png = bytes.startsWith("\x89PNG\r\n\x1a\n");
+    const jpeg = bytes.startsWith("\xff\xd8\xff");
+    const webp = bytes.startsWith("RIFF") && bytes.slice(8, 12) === "WEBP";
+    return (visual.mimeType === "image/png" && png) ||
+      (visual.mimeType === "image/jpeg" && jpeg) ||
+      (visual.mimeType === "image/webp" && webp)
+      ? dataUrl
+      : null;
+  } catch {
+    return null;
+  }
+}
+export function MeetingVisuals({ insight }: { insight: Insight }) {
+  const [failed, setFailed] = useState<string[]>([]);
+  useEffect(() => setFailed([]), [insight.visuals]);
+  const entries = (insight.visuals || []).map((visual) => ({
+    visual,
+    source: visualSource(visual),
+  }));
+  const display = entries.filter(
+    (entry) => entry.source && !failed.includes(entry.visual.id),
+  );
+  const rejected = entries.some(
+    (entry) => !entry.source || failed.includes(entry.visual.id),
+  );
+  if (!entries.length && !insight.visualError) return null;
+  return (
+    <section className="summary-visuals" aria-label="Meeting visuals">
+      <div className="section-label">
+        <span className="small-icon">
+          <Sparkles size={17} />
+        </span>
+        <h3>Visual notes</h3>
+      </div>
+      {display.map(({ visual, source }) => (
+        <figure className="meeting-visual" key={visual.id}>
+          <div className="visual-heading">
+            <strong>{visual.title}</strong>
+            <span>AI-generated</span>
+          </div>
+          <img
+            src={source!}
+            alt={visual.description || visual.title}
+            loading="lazy"
+            onError={() =>
+              setFailed((old) => [...new Set([...old, visual.id])])
+            }
+          />
+          <figcaption>{visual.description}</figcaption>
+          <a
+            className="inline-link"
+            href={source!}
+            download={`${visual.title.replace(/[^a-zA-Z0-9 -]/g, "").slice(0, 80) || "meeting-visual"}.${visual.mimeType === "image/jpeg" ? "jpg" : visual.mimeType === "image/webp" ? "webp" : "png"}`}
+          >
+            <ArrowDownToLine size={13} />
+            Download image
+          </a>
+        </figure>
+      ))}
+      {insight.visualError && (
+        <p className="visual-notice" role="status">
+          {insight.visualError} Your summary and action items are still
+          available.
+        </p>
+      )}
+      {rejected && (
+        <p className="visual-notice" role="status">
+          A generated visual couldn’t be displayed. Your meeting notes are still
+          available.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export function ChatPanel({
   meeting,
   onRefresh,
   onMessage,
   onSeek,
   llm,
+  webSearchEnabled = false,
   onSettings,
 }: {
   meeting: Meeting;
@@ -1511,6 +1624,7 @@ function ChatPanel({
   onMessage: (message: ChatMessage) => void;
   onSeek: (id: string) => void;
   llm?: string;
+  webSearchEnabled?: boolean;
   onSettings: () => void;
 }) {
   const [input, setInput] = useState("");
@@ -1568,7 +1682,10 @@ function ChatPanel({
               </div>
               <p>{message.text}</p>
               {message.citations?.length ? (
-                <div className="chat-citations">
+                <div
+                  className="chat-citations"
+                  aria-label="Transcript citations"
+                >
                   {message.citations.map((id) => {
                     const s = meeting.segments.find(
                       (segment) => segment.id === id,
@@ -1582,6 +1699,42 @@ function ChatPanel({
                   })}
                 </div>
               ) : null}
+              {message.webSearchUsed && (
+                <div className="web-search-used">
+                  <Search size={11} />
+                  Web search used
+                </div>
+              )}
+              {!!message.webSources?.filter((source) =>
+                isExternalSourceUrl(source.url),
+              ).length && (
+                <div className="chat-web-sources" aria-label="Web sources">
+                  <strong>Web sources</strong>
+                  {message.webSources
+                    .filter((source) => isExternalSourceUrl(source.url))
+                    .map((source, index) => (
+                      <a
+                        key={`${source.url}-${index}`}
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          void openExternalLink(source.url).catch((error) =>
+                            setError(
+                              `Couldn’t open this web source: ${(error as Error).message}`,
+                            ),
+                          );
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                        <span>
+                          {source.title || new URL(source.url).hostname}
+                        </span>
+                      </a>
+                    ))}
+                </div>
+              )}
             </div>
           ))
         ) : (
@@ -1613,7 +1766,9 @@ function ChatPanel({
             </div>
             <p className="chat-context">
               <FileText size={13} />
-              Answers grounded in this transcript.
+              {webSearchEnabled
+                ? "Uses this transcript; web search may add external sources."
+                : "Answers grounded in this transcript."}
             </p>
           </div>
         )}
@@ -1622,7 +1777,9 @@ function ChatPanel({
             <span />
             <span />
             <span />
-            Reading the conversation
+            {webSearchEnabled
+              ? "Preparing your answer"
+              : "Reading the conversation"}
           </div>
         )}
         {error && (
@@ -1667,7 +1824,9 @@ function ChatPanel({
           <div className="compose-bottom">
             <span>
               <FileText size={12} />
-              This meeting only
+              {webSearchEnabled
+                ? "Meeting + web when supported"
+                : "This meeting only"}
             </span>
             <button
               type="submit"
@@ -2163,10 +2322,20 @@ function ModelDiscoveryStatus({
   discovery,
   selected,
   kind,
+  webSearchEnabled = false,
+  onWebSearchChange,
+  summaryDiagramsEnabled = false,
+  onSummaryDiagramsChange,
+  providerName = "the selected provider",
 }: {
   discovery: ModelDiscovery;
   selected: string;
   kind: "llm" | "stt";
+  webSearchEnabled?: boolean;
+  onWebSearchChange?: (enabled: boolean) => void;
+  summaryDiagramsEnabled?: boolean;
+  onSummaryDiagramsChange?: (enabled: boolean) => void;
+  providerName?: string;
 }) {
   const info = discovery.info;
   const label = kind === "llm" ? "language" : "speech";
@@ -2254,11 +2423,96 @@ function ModelDiscoveryStatus({
               <> — {capabilities.webSearchNote}</>
             )}
           </p>
-          <p>
-            <strong>Web access in NoteThis: not enabled.</strong> Meeting chat
-            returns text and uses your transcript; selecting a model does not
-            enable web or multimodal tools in NoteThis.
+          <div className="web-search-setting">
+            <div>
+              <strong>Allow web search</strong>
+              <p>
+                Send your question, recent conversation, and relevant transcript
+                excerpts to {providerName} for {selected}. These may be used to
+                form web queries.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Allow web search"
+              aria-checked={webSearchEnabled}
+              disabled={
+                !onWebSearchChange ||
+                (!webSearchEnabled && capabilities?.appWebSearch !== true)
+              }
+              className={`follow-button ${webSearchEnabled ? "on" : ""}`}
+              onClick={() => onWebSearchChange?.(!webSearchEnabled)}
+            >
+              <span className="toggle-track">
+                <span />
+              </span>
+              <span>{webSearchEnabled ? "On" : "Off"}</span>
+            </button>
+          </div>
+          <p aria-label="NoteThis web access">
+            <strong>Web access in NoteThis: </strong>
+            {capabilities?.appWebSearch === true
+              ? webSearchEnabled
+                ? "enabled for this model."
+                : "available; currently off."
+              : webSearchEnabled
+                ? "saved as on; unavailable for this model."
+                : "not available for this model."}
           </p>
+          {webSearchEnabled && capabilities?.appWebSearch !== true && (
+            <p className="model-selection-warning" role="status">
+              Web search is saved as on, but this model does not currently have
+              verified web-search support in NoteThis. Turn it off or choose a
+              supported model before using web search.
+            </p>
+          )}
+          <div className="web-search-setting">
+            <div>
+              <strong>Generate summary diagrams with {providerName}</strong>
+              <p>
+                Send transcript-derived diagram descriptions and supporting
+                excerpts to {providerName} for {selected}. Images are generated
+                when helpful.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Generate summary diagrams"
+              aria-checked={summaryDiagramsEnabled}
+              disabled={
+                !onSummaryDiagramsChange ||
+                (!summaryDiagramsEnabled &&
+                  capabilities?.appImageOutput !== true)
+              }
+              className={`follow-button ${summaryDiagramsEnabled ? "on" : ""}`}
+              onClick={() => onSummaryDiagramsChange?.(!summaryDiagramsEnabled)}
+            >
+              <span className="toggle-track">
+                <span />
+              </span>
+              <span>{summaryDiagramsEnabled ? "On" : "Off"}</span>
+            </button>
+          </div>
+          <p aria-label="NoteThis summary visuals">
+            <strong>Summary visuals in NoteThis: </strong>
+            {capabilities?.appImageOutput === true
+              ? summaryDiagramsEnabled
+                ? "enabled for this model; generated diagrams appear with your meeting notes."
+                : "available; currently off."
+              : summaryDiagramsEnabled
+                ? "saved as on; unavailable for this model."
+                : "not available for this model."}{" "}
+            Chat answers remain text.
+          </p>
+          {summaryDiagramsEnabled && capabilities?.appImageOutput !== true && (
+            <p className="model-selection-warning" role="status">
+              Summary diagrams are saved as on, but this model does not
+              currently have verified image support in NoteThis. Turn them off
+              or choose a supported model.
+            </p>
+          )}
         </>
       )}
       {checked && !Number.isNaN(checked.getTime()) && (
@@ -2409,6 +2663,8 @@ export function SettingsModal({
         ...draft.llm,
         model: draft.llm.model.trim(),
         baseUrl: draft.llm.baseUrl.trim(),
+        webSearch: draft.llm.webSearch === true,
+        summaryDiagrams: draft.llm.summaryDiagrams === true,
       };
       const local = {
         ...draft.local,
@@ -2898,6 +3154,10 @@ export function SettingsModal({
                             ...draft.llm,
                             provider: provider.id,
                             model: provider.models[0] || "",
+                            webSearch: false,
+                            webSearchConsentProvider: "",
+                            summaryDiagrams: false,
+                            summaryDiagramsConsentProvider: "",
                           },
                         });
                         setSaved(false);
@@ -2970,6 +3230,35 @@ export function SettingsModal({
                   discovery={languageModels}
                   selected={draft.llm.model}
                   kind="llm"
+                  webSearchEnabled={draft.llm.webSearch === true}
+                  providerName={llm?.name || draft.llm.provider}
+                  onWebSearchChange={(enabled) => {
+                    setDraft((old) => ({
+                      ...old,
+                      llm: {
+                        ...old.llm,
+                        webSearch: enabled,
+                        webSearchConsentProvider: enabled
+                          ? old.llm.provider
+                          : "",
+                      },
+                    }));
+                    setSaved(false);
+                  }}
+                  summaryDiagramsEnabled={draft.llm.summaryDiagrams === true}
+                  onSummaryDiagramsChange={(enabled) => {
+                    setDraft((old) => ({
+                      ...old,
+                      llm: {
+                        ...old.llm,
+                        summaryDiagrams: enabled,
+                        summaryDiagramsConsentProvider: enabled
+                          ? old.llm.provider
+                          : "",
+                      },
+                    }));
+                    setSaved(false);
+                  }}
                 />
                 {(llm?.id === "openai-compatible" || llm?.id === "custom") && (
                   <label className="field">

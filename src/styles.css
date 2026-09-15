@@ -3628,3 +3628,136 @@ textarea::placeholder {
     max-width: 185px;
   }
 }
+
+.web-search-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid #e3e3e6;
+  margin-top: 12px;
+  padding-top: 13px;
+}
+.web-search-setting > div {
+  flex: 1;
+}
+.web-search-setting strong {
+  font-size: 10px;
+  color: #454549;
+}
+.web-search-setting p {
+  margin-top: 4px;
+}
+.web-search-setting .follow-button {
+  font-size: 10px;
+  color: #665440;
+}
+.web-search-setting .toggle-track {
+  width: 28px;
+  height: 17px;
+}
+.web-search-setting .toggle-track > span {
+  width: 13px;
+  height: 13px;
+}
+.web-search-setting .on .toggle-track > span {
+  transform: translateX(11px);
+}
+.chat-web-sources {
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid #e3e3e6;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.chat-web-sources > strong {
+  font-size: 9px;
+  font-weight: 550;
+  color: #606065;
+}
+.chat-web-sources a {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #665440;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.chat-web-sources a svg {
+  margin-top: 3px;
+}
+.web-search-used {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8px;
+  color: #707074;
+  margin-top: 9px;
+}
+.summary-visuals {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #e3e3e6;
+}
+.meeting-visual {
+  margin: 17px 0;
+  border: 1px solid #e3e3e6;
+  border-radius: 9px;
+  padding: 15px;
+  background: #fafafa;
+}
+.visual-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+.visual-heading strong {
+  font-size: 12px;
+  font-weight: 550;
+  color: #454549;
+}
+.visual-heading > span {
+  font-size: 8px;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #eee8df;
+  color: #665440;
+}
+.meeting-visual img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: 560px;
+  object-fit: contain;
+  margin: auto;
+  border-radius: 5px;
+  background: #fff;
+}
+.meeting-visual figcaption {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #606065;
+  margin-top: 12px;
+  white-space: pre-wrap;
+}
+.meeting-visual > .inline-link {
+  font-size: 9px;
+  margin-top: 12px;
+}
+.visual-notice {
+  font-size: 10px;
+  line-height: 1.8;
+  padding: 12px 14px;
+  border: 1px solid #e8ded0;
+  border-radius: 7px;
+  background: #faf6f0;
+  color: #7b6044;
+  margin-top: 14px;
+}

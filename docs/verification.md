@@ -40,3 +40,12 @@ The app is now NoteThis, with an original closed calligraphy pen-cap icon and a 
 All **243 tests across 17 files** and the production build pass. The native identity regression verifies the legacy startup name before Electron is ready, the NoteThis display name after readiness, unchanged data/session directories, and explicit temporary-profile support. The bundle identifier, data folder, and startup encryption identity remain stable; no credentials were read, migrated, or deleted. Live credential decryption was not exercised. Native fake-device tests retain finite timeouts sized for concurrent Electron startup.
 
 Use `Launch NoteThis.command`; existing `Launch Cadence.command` shortcuts forward to it. Quit an older running instance before opening the new app. The project/repository path remains AIMeetingNotes; existing storage and logs retain their Cadence directory names.
+
+
+## Optional web research and summary diagrams — September 15, 2026
+
+NoteThis 0.3.0 adds separate default-off settings for web search in meeting questions and useful summary diagrams. Each setting identifies the provider, model, and outgoing data; consent is bound to the provider and resets when changing providers. The API, persisted settings, and transport paths enforce these bindings. Account/local model metadata must explicitly report the relevant capability, and NoteThis must implement its provider transport.
+
+All **318 tests across 19 files** pass, including 52 mocked rich-provider transport tests and real Chromium settings/display checks. Coverage includes feature availability, missing/revoked capabilities, off-state and missing-consent prevention of network calls, Responses streaming, OpenRouter citations, bounded raster validation, exact transcript evidence for diagram plans, long-transcript input limits, image persistence/removal, portable Markdown export, and preserving notes after image errors. Web citations remain separate from timestamp references; generated diagrams have captions, labels, downloads, and nonfatal error notices.
+
+The production build and Apple Silicon packaging pass. The ad-hoc app signature verifies with `codesign --verify --deep --strict`, and all five packaged frontend/backend build files exactly match the current build. The new provider tests use synthetic responses only: no private transcript was sent to a cloud provider, no live web/image generation was billed, and account-specific quota or execution remains unverified.

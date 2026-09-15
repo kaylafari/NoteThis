@@ -1,6 +1,6 @@
 # Speech and language models
 
-AIM Meeting Notes keeps recordings and transcripts on this computer by default. The default speech recognizer is **faster-whisper / base**, running on CPU with real word timestamps. The default language model is **Ollama / qwen3:0.6b**; this small open model makes the initial download practical, but the larger Qwen, Llama, or Gemma options generally give stronger summaries. Models must be installed before local use. Whisper downloads its selected weights on its first transcription.
+NoteThis keeps recordings and transcripts on this computer by default. The default speech recognizer is **faster-whisper / base**, running on CPU with real word timestamps. The default language model is **Ollama / qwen3:0.6b**; this small open model makes the initial download practical, but the larger Qwen, Llama, or Gemma options generally give stronger summaries. Models must be installed before local use. Whisper downloads its selected weights on its first transcription.
 
 Choosing a cloud speech provider sends that recording's audio to that provider. Choosing a cloud language model sends the relevant transcript and question to that provider. Browser LLM login does not grant access to paid speech APIs. No existing OpenClaw, browser, shell-environment, or Codex credentials are imported.
 
@@ -45,6 +45,10 @@ Browser flows use pi-ai's own provider-specific PKCE, callback, or device-code i
 Account access and provider policy still determine whether a subscription can be used with each adapter. These flows are not a claim that every OpenClaw auth plugin is supported: OpenClaw adds provider-specific integrations beyond pi-ai, and those extra integrations are not copied into this app. Google here uses an API key, not an invented Google OAuth flow.
 
 For Ollama, pull the model you select, e.g. `ollama pull qwen3:0.6b`. For LM Studio or another local server, select **OpenAI-compatible server**, supply the full `/v1` base URL and model ID, and leave the key empty if the server does not require authentication. HTTP is allowed only on loopback; remote custom endpoints require HTTPS. OAuth credentials cannot be sent to arbitrary custom endpoints.
+
+## Optional web search and summary diagrams
+
+See [model discovery and feature settings](model-discovery.md) for capability checks, provider-specific opt-ins, supported adapters, citations, and diagram generation. Provider protocol tests use synthetic responses; passing them does not verify a particular account’s quota or a live generation request.
 
 ## Source references
 

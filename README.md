@@ -63,6 +63,8 @@ LLM API adapters come from the installed `@mariozechner/pi-ai` dependency used b
 
 **LLM browser sign-in does not grant speech API access.** Cloud speech providers require an API key. Custom OpenAI-compatible servers (including LM Studio) accept a model ID and base URL. Infrastructure-specific integrations such as AWS Bedrock, Vertex, and Azure are not exposed as single-key providers.
 
+In **Settings → Language model**, optional web search adds external sources to **Ask this meeting** when the selected model reports support. Optional summary diagrams generate a useful model, tree, or process visual when an image-capable model is selected. Both switches start off, disclose what is sent to the named service, and reset when you change providers. Current adapters support web search through ChatGPT/Codex, OpenAI, and OpenRouter, and image output through OpenRouter; missing capability metadata keeps the relevant feature unavailable. See [model discovery and feature settings](docs/model-discovery.md) for details.
+
 See [provider support and source references](docs/providers.md) for exact capabilities, timing limitations, and authentication details.
 
 ## Local data and privacy

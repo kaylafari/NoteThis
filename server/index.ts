@@ -46,6 +46,10 @@ const settingsSchema = z
         provider: modelSchema,
         model: modelSchema,
         baseUrl: z.string().max(1000),
+        webSearch: z.boolean().optional(),
+        webSearchConsentProvider: z.string().max(200).optional(),
+        summaryDiagrams: z.boolean().optional(),
+        summaryDiagramsConsentProvider: z.string().max(200).optional(),
       })
       .optional(),
     local: z
@@ -283,6 +287,21 @@ export async function startServer(options: ServerOptions = {}) {
   );
   app.put("/api/settings", async (req, res) => {
     const update = settingsSchema.parse(req.body);
+    if (update.llm) {
+      const llm = update.llm;
+      if (
+        (llm.webSearch === true &&
+          llm.webSearchConsentProvider !== llm.provider) ||
+        (llm.summaryDiagrams === true &&
+          llm.summaryDiagramsConsentProvider !== llm.provider)
+      )
+        throw Object.assign(
+          new Error(
+            "Enable the feature in Settings after reviewing the data sent to the selected provider.",
+          ),
+          { status: 400 },
+        );
+    }
     const catalog = providerCatalog();
     if (update.stt && !catalog.stt.some((p) => p.id === update.stt!.provider))
       throw new Error("Unknown transcription provider.");
@@ -451,6 +470,12 @@ export async function startServer(options: ServerOptions = {}) {
       }),
     );
   });
+  app.get("/api/meetings/:id/visuals/:visualId", async (req, res) => {
+    const visual = await store.getVisual(req.params.id, req.params.visualId);
+    if (!visual)
+      return res.status(404).json({ error: "Summary image not found." });
+    res.type(visual.mimeType).send(visual.data);
+  });
   app.post("/api/meetings/:id/chat", async (req, res) => {
     const { message } = z
       .object({ message: z.string().trim().min(1).max(4000) })
@@ -512,10 +537,21 @@ export async function startServer(options: ServerOptions = {}) {
       "Content-Disposition",
       `attachment; filename="meeting-${m.id}.md"`,
     );
+    const diagrams: string[] = [];
+    for (const visual of m.insight?.visuals || []) {
+      const image = await store.getVisual(m.id, visual.id);
+      if (image)
+        diagrams.push(
+          `### ${visual.title}\n\n${visual.description}\n\n![AI-generated meeting diagram](data:${image.mimeType};base64,${image.data.toString("base64")})\n\n*AI-generated; verify labels against the transcript.*`,
+        );
+    }
+    const visualMarkdown = diagrams.length
+      ? `\n\n## Diagrams\n\n${diagrams.join("\n\n")}`
+      : "";
     res
       .type("text/markdown")
       .send(
-        `# ${m.title}\n\n${m.insight?.summary || ""}\n\n## Actions\n${m.insight?.actions.map((a) => `- [${a.done ? "x" : " "}] ${a.text}${a.owner ? " — " + a.owner : ""}${a.due ? " (" + a.due + ")" : ""}`).join("\n") || ""}\n\n## Transcript\n${m.segments.map((s) => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")}] ${s.text}`).join("\n\n")}`,
+        `# ${m.title}\n\n${m.insight?.summary || ""}${visualMarkdown}\n\n## Actions\n${m.insight?.actions.map((a) => `- [${a.done ? "x" : " "}] ${a.text}${a.owner ? " — " + a.owner : ""}${a.due ? " (" + a.due + ")" : ""}`).join("\n") || ""}\n\n## Transcript\n${m.segments.map((s) => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")}] ${s.text}`).join("\n\n")}`,
       );
   });
   app.post("/api/demo", async (_req, res) => {

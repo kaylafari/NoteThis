@@ -297,3 +297,156 @@ describe("model discovery API", () => {
     ).toBe(400);
   });
 });
+
+describe("rich-feature settings consent", () => {
+  it("defaults web search and summary diagrams to off", async () => {
+    const settings = await (await request("/settings")).json();
+    expect(settings.llm.webSearch).toBe(false);
+    expect(settings.llm.summaryDiagrams).toBe(false);
+    expect(settings.llm.webSearchConsentProvider).toBeUndefined();
+    expect(settings.llm.summaryDiagramsConsentProvider).toBeUndefined();
+  });
+
+  it.each([
+    ["webSearch", "webSearchConsentProvider", undefined],
+    ["webSearch", "webSearchConsentProvider", "different-provider"],
+    ["summaryDiagrams", "summaryDiagramsConsentProvider", undefined],
+    ["summaryDiagrams", "summaryDiagramsConsentProvider", "different-provider"],
+  ])(
+    "rejects enabling %s without matching consent (%s=%s)",
+    async (flag, binding, value) => {
+      const before = await (await request("/settings")).json();
+      const discoveryCalls = vi.mocked(discoverProviderModels).mock.calls
+        .length;
+      const response = await request("/settings", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          llm: { ...before.llm, [flag!]: true, [binding!]: value },
+        }),
+      });
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toContain(
+        "reviewing the data sent to the selected provider",
+      );
+      expect((await (await request("/settings")).json()).llm).toEqual(
+        before.llm,
+      );
+      expect(vi.mocked(discoverProviderModels).mock.calls).toHaveLength(
+        discoveryCalls,
+      );
+    },
+  );
+});
+
+describe("generated summary diagram delivery", () => {
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aFyoAAAAASUVORK5CYII=",
+    "base64",
+  );
+  beforeAll(async () => {
+    await writeFile(
+      path.join(dataDir, "visuals", "visual-fixture-flow.png"),
+      png,
+    );
+    await writeFile(
+      path.join(dataDir, "meetings", "visual-fixture.json"),
+      JSON.stringify({
+        id: "visual-fixture",
+        title: "Diagram fixture",
+        createdAt: new Date().toISOString(),
+        duration: 1,
+        status: "ready",
+        audioFile: "fixture.wav",
+        segments: [],
+        messages: [],
+        insight: {
+          summary: "The request moves through a queue.",
+          decisions: [],
+          actions: [],
+          visuals: [
+            {
+              id: "flow",
+              title: "Request flow",
+              description: "Client to queue to worker.",
+              imageFile: "visual-fixture-flow.png",
+              mimeType: "image/png",
+            },
+          ],
+        },
+      }),
+    );
+    await writeFile(
+      path.join(dataDir, "meetings", "visual-missing.json"),
+      JSON.stringify({
+        id: "visual-missing",
+        title: "Missing raster fixture",
+        createdAt: new Date().toISOString(),
+        duration: 1,
+        status: "ready",
+        audioFile: "fixture.wav",
+        segments: [],
+        messages: [],
+        insight: {
+          summary: "Missing file",
+          decisions: [],
+          actions: [],
+          visuals: [
+            {
+              id: "flow",
+              title: "Missing test resource",
+              description: "Synthetic missing file",
+              imageFile: "visual-missing-flow.png",
+              mimeType: "image/png",
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("serves the saved image as PNG bytes and exposes its local URL without base64", async () => {
+    const response = await request("/meetings/visual-fixture/visuals/flow");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(png);
+    const meeting = await (await request("/meetings/visual-fixture")).json();
+    expect(meeting.insight.visuals[0].imageUrl).toBe(
+      "/api/meetings/visual-fixture/visuals/flow",
+    );
+    expect(meeting.insight.visuals[0].dataUrl).toBeUndefined();
+  });
+
+  it("returns 404 for absent meetings, visual IDs, and raster files", async () => {
+    for (const route of [
+      "/meetings/missing/visuals/flow",
+      "/meetings/visual-fixture/visuals/no-such-visual",
+      "/meetings/visual-missing/visuals/flow",
+    ]) {
+      const response = await request(route);
+      expect(response.status).toBe(404);
+      expect((await response.json()).error).toBe("Summary image not found.");
+    }
+  });
+
+  it("exports a portable diagram with its title, description, and generated-content label", async () => {
+    const response = await request("/meetings/visual-fixture/export");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/markdown");
+    expect(response.headers.get("content-disposition")).toContain(
+      "meeting-visual-fixture.md",
+    );
+    const markdown = await response.text();
+    expect(markdown).toContain("## Diagrams");
+    expect(markdown).toContain("### Request flow");
+    expect(markdown).toContain("Client to queue to worker.");
+    expect(markdown).toContain(
+      `![AI-generated meeting diagram](data:image/png;base64,${png.toString("base64")})`,
+    );
+    expect(markdown).toContain(
+      "AI-generated; verify labels against the transcript.",
+    );
+    expect(markdown).not.toContain("/api/meetings/");
+    expect(markdown).not.toContain("Missing test resource");
+  });
+});

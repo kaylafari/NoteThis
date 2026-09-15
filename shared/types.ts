@@ -15,16 +15,29 @@ export type ActionItem = {
   done: boolean;
   segmentId?: string;
 };
+export type SummaryVisual = {
+  id: string;
+  title: string;
+  description: string;
+  mimeType: string;
+  dataUrl?: string;
+  imageFile?: string;
+  imageUrl?: string;
+};
 export type Insight = {
   summary: string;
   decisions: string[];
   actions: ActionItem[];
+  visuals?: SummaryVisual[];
+  visualError?: string;
 };
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   citations?: string[];
+  webSources?: { title: string; url: string }[];
+  webSearchUsed?: boolean;
   createdAt: string;
 };
 export type Meeting = {
@@ -52,7 +65,15 @@ export type ProviderOption = {
 };
 export type Settings = {
   stt: { provider: string; model: string; language: string };
-  llm: { provider: string; model: string; baseUrl: string };
+  llm: {
+    provider: string;
+    model: string;
+    baseUrl: string;
+    webSearch?: boolean;
+    webSearchConsentProvider?: string;
+    summaryDiagrams?: boolean;
+    summaryDiagramsConsentProvider?: string;
+  };
   local: { whisperModel: string; pythonPath: string; ollamaUrl: string };
   configuredKeys: string[];
   oauthConnections: string[];
@@ -86,6 +107,8 @@ export type ModelCapabilities = {
   outputModalities: string[] | null;
   webSearch: "supported" | "unsupported" | "unknown";
   webSearchNote?: string;
+  appWebSearch?: boolean;
+  appImageOutput?: boolean;
 };
 
 export type ProviderModels = {

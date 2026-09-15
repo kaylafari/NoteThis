@@ -14,6 +14,7 @@ import {
   createDecipheriv,
   randomUUID,
 } from "node:crypto";
+import { decodeVisual, visualFilename } from "./visual-storage.js";
 import type { Meeting, Settings, SettingsUpdate } from "../shared/types.js";
 
 export type SecretCodec = {
@@ -22,7 +23,13 @@ export type SecretCodec = {
 };
 export const defaultSettings: Settings = {
   stt: { provider: "local", model: "base", language: "" },
-  llm: { provider: "ollama", model: "qwen3:0.6b", baseUrl: "" },
+  llm: {
+    provider: "ollama",
+    model: "qwen3:0.6b",
+    baseUrl: "",
+    webSearch: false,
+    summaryDiagrams: false,
+  },
   local: {
     whisperModel: "base",
     pythonPath: ".venv/bin/python",
@@ -47,6 +54,7 @@ async function json<T>(file: string, fallback: T): Promise<T> {
 export class Store {
   readonly meetingsDir: string;
   readonly audioDir: string;
+  readonly visualsDir: string;
   private settings!: Settings;
   private secrets: Record<string, string> = {};
   private key!: Buffer;
@@ -57,12 +65,14 @@ export class Store {
   ) {
     this.meetingsDir = path.join(dataDir, "meetings");
     this.audioDir = path.join(dataDir, "audio");
+    this.visualsDir = path.join(dataDir, "visuals");
   }
   async init() {
     for (const dir of [
       this.dataDir,
       this.meetingsDir,
       this.audioDir,
+      this.visualsDir,
       path.join(this.dataDir, "uploads"),
     ]) {
       await mkdir(dir, { recursive: true, mode: 0o700 });
@@ -75,6 +85,8 @@ export class Store {
         {},
       )),
     };
+    this.settings.llm = { ...defaultSettings.llm, ...this.settings.llm };
+    this.normalizeFeatureConsent();
     this.secrets = await json(path.join(this.dataDir, "secrets.json"), {});
     const keyPath = path.join(this.dataDir, "secret.key");
     try {
@@ -100,10 +112,11 @@ export class Store {
     const results = await Promise.all(
       files.map(async (f) => {
         try {
-          return await json<Meeting | null>(
+          const meeting = await json<Meeting | null>(
             path.join(this.meetingsDir, f),
             null,
           );
+          return meeting ? this.withVisualUrls(meeting) : null;
         } catch {
           return null;
         }
@@ -117,20 +130,101 @@ export class Store {
     if (!/^[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error("Invalid meeting ID");
     return path.join(this.meetingsDir, `${id}.json`);
   }
+  private withVisualUrls(meeting: Meeting): Meeting {
+    for (const visual of meeting.insight?.visuals || []) {
+      delete visual.imageUrl;
+      try {
+        if (visual.imageFile === visualFilename(meeting.id, visual))
+          visual.imageUrl = `/api/meetings/${meeting.id}/visuals/${visual.id}`;
+      } catch {
+        delete visual.imageUrl;
+      }
+    }
+    return meeting;
+  }
   async get(id: string) {
-    return json<Meeting | null>(this.file(id), null);
+    const meeting = await json<Meeting | null>(this.file(id), null);
+    return meeting ? this.withVisualUrls(meeting) : null;
   }
   async save(meeting: Meeting) {
+    const previous = await this.get(meeting.id);
+    const visuals = meeting.insight?.visuals || [];
+    if (visuals.length > 1)
+      throw new Error("Only one summary diagram is supported per meeting.");
+    for (const visual of visuals) {
+      const filename = visualFilename(meeting.id, visual);
+      if (visual.dataUrl) {
+        const buffer = decodeVisual(visual);
+        const temporary = path.join(
+          this.visualsDir,
+          `${filename}.${randomUUID()}.tmp`,
+        );
+        await writeFile(temporary, buffer, { mode: 0o600 });
+        await rename(temporary, path.join(this.visualsDir, filename));
+        visual.imageFile = filename;
+        delete visual.dataUrl;
+      } else if (visual.imageFile !== filename)
+        throw new Error("Invalid summary image file.");
+      delete visual.imageUrl;
+    }
     await atomicJson(this.file(meeting.id), meeting);
-    return meeting;
+    const retained = new Set(visuals.map((visual) => visual.imageFile));
+    for (const visual of previous?.insight?.visuals || []) {
+      try {
+        const filename = visualFilename(meeting.id, visual);
+        if (visual.imageFile === filename && !retained.has(filename))
+          await rm(path.join(this.visualsDir, filename), { force: true });
+      } catch {
+        /* Keep a malformed old reference from preventing a save. */
+      }
+    }
+    return this.withVisualUrls(meeting);
+  }
+  async getVisual(id: string, visualId: string) {
+    const meeting = await this.get(id);
+    const visual = meeting?.insight?.visuals?.find(
+      (item) => item.id === visualId,
+    );
+    if (!visual || visual.imageFile !== visualFilename(id, visual)) return null;
+    try {
+      return {
+        data: await readFile(path.join(this.visualsDir, visual.imageFile)),
+        mimeType: visual.mimeType,
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
   }
   async remove(id: string) {
     const m = await this.get(id);
+    for (const visual of m?.insight?.visuals || []) {
+      const filename = visualFilename(id, visual);
+      if (visual.imageFile === filename)
+        await rm(path.join(this.visualsDir, filename), { force: true });
+    }
     if (m)
       await rm(path.join(this.audioDir, path.basename(m.audioFile)), {
         force: true,
       });
     await rm(this.file(id), { force: true });
+  }
+  private normalizeFeatureConsent() {
+    const llm = this.settings.llm;
+    if (
+      llm.webSearch !== true ||
+      llm.webSearchConsentProvider !== llm.provider
+    ) {
+      llm.webSearch = false;
+      delete llm.webSearchConsentProvider;
+    }
+    if (
+      llm.summaryDiagrams !== true ||
+      llm.summaryDiagramsConsentProvider !== llm.provider
+    ) {
+      llm.summaryDiagrams = false;
+      delete llm.summaryDiagramsConsentProvider;
+    }
   }
   async getSettings(): Promise<Settings> {
     return {
@@ -148,9 +242,10 @@ export class Store {
     this.settings = {
       ...this.settings,
       ...(update.stt ? { stt: update.stt } : {}),
-      ...(update.llm ? { llm: update.llm } : {}),
+      ...(update.llm ? { llm: { ...this.settings.llm, ...update.llm } } : {}),
       ...(update.local ? { local: update.local } : {}),
     };
+    this.normalizeFeatureConsent();
     await atomicJson(path.join(this.dataDir, "settings.json"), {
       stt: this.settings.stt,
       llm: this.settings.llm,

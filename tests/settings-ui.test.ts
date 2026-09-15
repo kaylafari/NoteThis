@@ -287,9 +287,30 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
       );
       await check(
         () =>
-          text().includes("Web access in NoteThis: not enabled.") &&
-          text().includes("Meeting chat returns text"),
-        "Model capability display states the actual text-only, no-web app behavior",
+          text().includes(
+            "Web access in NoteThis: not available for this model.",
+          ) && text().includes("Chat answers remain text"),
+        "Model capability display reports unavailable app adapters without claiming provider tools are enabled",
+      );
+      const webToggle = () =>
+        document.querySelector(
+          '[role="switch"][aria-label="Allow web search"]',
+        ) as HTMLButtonElement;
+      await check(
+        () =>
+          webToggle().getAttribute("aria-checked") === "false" &&
+          webToggle().disabled,
+        "Web search defaults off and cannot be enabled without an implemented verified adapter",
+      );
+      const diagramsToggle = () =>
+        document.querySelector(
+          '[role="switch"][aria-label="Generate summary diagrams"]',
+        ) as HTMLButtonElement;
+      await check(
+        () =>
+          diagramsToggle().getAttribute("aria-checked") === "false" &&
+          diagramsToggle().disabled,
+        "Summary diagram generation defaults off without an available adapter",
       );
       for (const provider of catalog.stt) {
         await set(input("Speech provider"), provider.id);
@@ -573,10 +594,105 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
         "Provider-supported web search displays its source note",
       );
       await check(
-        () => text().includes("Web access in NoteThis: not enabled."),
-        "Provider web support never implies browsing is enabled in NoteThis",
+        () =>
+          webToggle().disabled &&
+          text().includes(
+            "Web access in NoteThis: not available for this model.",
+          ),
+        "Provider search support alone does not enable an unimplemented app adapter",
+      );
+      discoveryOverrides.set(`llm:${oauthProvider.id}`, {
+        capabilities: {
+          [discoveredModel]: {
+            outputModalities: ["text", "image"],
+            webSearch: "supported",
+            appWebSearch: true,
+            appImageOutput: true,
+          },
+        },
+      });
+      (
+        document.querySelector(
+          '[aria-label="Refresh language models"]',
+        ) as HTMLButtonElement
+      ).click();
+      await check(
+        () =>
+          !webToggle().disabled &&
+          text().includes(
+            "Web access in NoteThis: available; currently off.",
+          ) &&
+          text().includes(
+            "Summary visuals in NoteThis: available; currently off",
+          ),
+        "Verified implemented adapters expose optional web search and summary visuals",
+      );
+      await check(
+        () =>
+          text().includes(
+            `Send your question, recent conversation, and relevant transcript excerpts to ${oauthProvider.name} for ${discoveredModel}`,
+          ) &&
+          text().includes(
+            `Send transcript-derived diagram descriptions and supporting excerpts to ${oauthProvider.name} for ${discoveredModel}`,
+          ),
+        "Feature opt-ins name the actual selected provider, model, and outgoing data",
+      );
+      diagramsToggle().click();
+      await check(
+        () =>
+          diagramsToggle().getAttribute("aria-checked") === "true" &&
+          webToggle().getAttribute("aria-checked") === "false",
+        "Summary diagrams can be explicitly enabled independently from web search",
+      );
+      webToggle().click();
+      await check(
+        () =>
+          webToggle().getAttribute("aria-checked") === "true" &&
+          text().includes("Web access in NoteThis: enabled for this model."),
+        "Web search can be explicitly enabled for a supported model",
+      );
+      await set(input("Language model provider"), "ollama");
+      await check(
+        () =>
+          webToggle().getAttribute("aria-checked") === "false" &&
+          diagramsToggle().getAttribute("aria-checked") === "false",
+        "Changing providers resets both feature opt-ins",
       );
       await click("Save preferences");
+      await check(
+        () =>
+          persisted.llm.webSearch === false &&
+          persisted.llm.summaryDiagrams === false &&
+          !persisted.llm.webSearchConsentProvider &&
+          !persisted.llm.summaryDiagramsConsentProvider,
+        "Provider change clears persisted consent bindings",
+      );
+      await set(input("Language model provider"), oauthProvider.id);
+      await until(
+        () =>
+          !!document.querySelector(
+            `select[aria-label="Language model"] option[value="${discoveredModel}"]`,
+          ),
+        "Account model choices return",
+      );
+      await set(input("Language model"), discoveredModel);
+      await until(
+        () => !webToggle().disabled && !diagramsToggle().disabled,
+        "Adapters become available again",
+      );
+      webToggle().click();
+      diagramsToggle().click();
+      await click("Save preferences");
+      await check(
+        () =>
+          persisted.llm.webSearch === true &&
+          persisted.llm.summaryDiagrams === true &&
+          persisted.llm.webSearchConsentProvider === oauthProvider.id &&
+          persisted.llm.summaryDiagramsConsentProvider === oauthProvider.id &&
+          persisted.llm.model === discoveredModel &&
+          persisted.local.pythonPath === "/custom/python",
+        "Saving web-search preference preserves selected model and other settings",
+      );
       await check(
         () => persisted.llm.model === discoveredModel,
         "New account model ID can be saved even absent from bundled catalog",
@@ -609,6 +725,49 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
           !text().includes("Synthetic provider search metadata"),
         "Unavailable discovery clears previously reported model capabilities",
       );
+      await check(
+        () =>
+          webToggle().getAttribute("aria-checked") === "true" &&
+          !webToggle().disabled &&
+          text().includes("Web search is saved as on"),
+        "Saved-on but unavailable web search is explained and can still be disabled",
+      );
+      const settingsBeforeDisable = JSON.stringify({
+        stt: persisted.stt,
+        local: persisted.local,
+        model: persisted.llm.model,
+        provider: persisted.llm.provider,
+      });
+      webToggle().click();
+      await check(
+        () =>
+          webToggle().getAttribute("aria-checked") === "false" &&
+          webToggle().disabled,
+        "Unsupported saved preference can be turned off without re-enabling it",
+      );
+      await check(
+        () =>
+          diagramsToggle().getAttribute("aria-checked") === "true" &&
+          !diagramsToggle().disabled &&
+          text().includes("Summary diagrams are saved as on"),
+        "Unavailable diagram preference remains independently switchable off",
+      );
+      diagramsToggle().click();
+      await click("Save preferences");
+      await check(
+        () =>
+          persisted.llm.webSearch === false &&
+          persisted.llm.summaryDiagrams === false &&
+          !persisted.llm.webSearchConsentProvider &&
+          !persisted.llm.summaryDiagramsConsentProvider &&
+          JSON.stringify({
+            stt: persisted.stt,
+            local: persisted.local,
+            model: persisted.llm.model,
+            provider: persisted.llm.provider,
+          }) === settingsBeforeDisable,
+        "Turning off unavailable web search preserves all unrelated preferences",
+      );
       discoveryOverrides.set(`llm:${oauthProvider.id}`, {
         source: "bundled",
         models: ["fallback-suggestion", "no-capability-metadata"],
@@ -618,6 +777,8 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
             outputModalities: ["text"],
             webSearch: "unsupported",
             webSearchNote: "Synthetic provider reports no search support",
+            appWebSearch: true,
+            appImageOutput: true,
           },
         },
       });
@@ -654,6 +815,14 @@ test("provider settings, native handoff feedback, and OAuth lifecycle work in re
             ?.textContent?.includes("Unknown (not reported)") &&
           !text().includes("Synthetic provider reports no search support"),
         "Unexpected capabilities on a bundled response are not presented as provider verified",
+      );
+      await check(
+        () =>
+          webToggle().disabled &&
+          text().includes(
+            "Summary visuals in NoteThis: not available for this model.",
+          ),
+        "Bundled metadata cannot activate web or image adapters",
       );
       discoveryOverrides.set(`llm:${oauthProvider.id}`, {
         source: "account",

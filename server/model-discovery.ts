@@ -7,6 +7,10 @@ import {
 } from "@mariozechner/pi-ai";
 import { getOAuthApiKey, getOAuthModel } from "./oauth.js";
 import { providerCatalog, validateEndpoint } from "./providers.js";
+import {
+  supportsWebSearch,
+  supportsImageOutput,
+} from "../shared/model-features.js";
 import { discoverModelCapabilities } from "./model-capabilities.js";
 import type { ProviderModels, Settings } from "../shared/types.js";
 
@@ -356,10 +360,24 @@ async function discover(
       kind,
       models,
       capabilities: Object.fromEntries(
-        models.map((id) => [
-          id,
-          discoverModelCapabilities(provider, metadata.get(id)!),
-        ]),
+        models.map((id) => {
+          const capabilities = discoverModelCapabilities(
+            provider,
+            metadata.get(id)!,
+          );
+          return [
+            id,
+            {
+              ...capabilities,
+              appWebSearch:
+                capabilities.webSearch === "supported" &&
+                supportsWebSearch(provider),
+              appImageOutput:
+                capabilities.outputModalities?.includes("image") === true &&
+                supportsImageOutput(provider),
+            },
+          ];
+        }),
       ),
       source:
         provider === "ollama" ||

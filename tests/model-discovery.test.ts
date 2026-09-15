@@ -105,6 +105,8 @@ describe("connected model discovery", () => {
     expect(result.capabilities?.["gpt-fixture-capabilities"]).toMatchObject({
       outputModalities: null,
       webSearch: "supported",
+      appWebSearch: true,
+      appImageOutput: false,
     });
     expect(Object.keys(result.capabilities || {})).toEqual(result.models);
     expect(JSON.stringify(result)).not.toContain("must-not-leak");
@@ -138,6 +140,8 @@ describe("connected model discovery", () => {
     expect(refreshed.capabilities?.[row.slug]).toMatchObject({
       outputModalities: null,
       webSearch: "unknown",
+      appWebSearch: false,
+      appImageOutput: false,
     });
   });
 
@@ -436,6 +440,34 @@ describe("connected model discovery", () => {
         key,
       ),
     ).rejects.toThrow("no longer listed");
+  });
+  it("enables only implemented features from explicit OpenRouter metadata", async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        data: [
+          {
+            id: "vendor/multimodal",
+            architecture: { output_modalities: ["text", "image"] },
+            supported_parameters: ["web_search_options"],
+          },
+          { id: "vendor/text", architecture: { output_modalities: ["text"] } },
+        ],
+      }),
+    );
+    const result = await discoverProviderModels(
+      "openrouter",
+      "llm",
+      settings,
+      key,
+    );
+    expect(result.capabilities?.["vendor/multimodal"]).toMatchObject({
+      appWebSearch: true,
+      appImageOutput: true,
+    });
+    expect(result.capabilities?.["vendor/text"]).toMatchObject({
+      appWebSearch: false,
+      appImageOutput: false,
+    });
   });
   it.each(["llm", "stt"] as const)(
     "uses OpenRouter's authenticated user-filtered %s catalog",

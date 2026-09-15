@@ -1,5 +1,14 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 vi.mock("../server/providers", () => ({ generateText: vi.fn() }));
+vi.mock("../server/model-discovery", () => ({
+  discoverProviderModels: vi.fn(),
+}));
+vi.mock("../server/rich-generation", () => ({
+  generateWebAnswer: vi.fn(),
+  generateSummaryImage: vi.fn(),
+  supportsWebSearch: vi.fn(),
+  supportsImageOutput: vi.fn(),
+}));
 import {
   MAX_MODEL_INPUT_BYTES,
   insightSchema,
@@ -11,6 +20,13 @@ import {
   splitTranscript,
 } from "../server/intelligence";
 import { generateText } from "../server/providers";
+import { discoverProviderModels } from "../server/model-discovery";
+import {
+  generateWebAnswer,
+  generateSummaryImage,
+  supportsWebSearch,
+  supportsImageOutput,
+} from "../server/rich-generation";
 import type { Segment, Settings } from "../shared/types";
 const segments: Segment[] = [
   {
@@ -118,6 +134,11 @@ const model = vi.mocked(generateText);
 const getKey = async () => undefined;
 beforeEach(() => {
   model.mockReset();
+  vi.mocked(discoverProviderModels).mockReset();
+  vi.mocked(generateWebAnswer).mockReset();
+  vi.mocked(generateSummaryImage).mockReset();
+  vi.mocked(supportsWebSearch).mockReset().mockReturnValue(false);
+  vi.mocked(supportsImageOutput).mockReset().mockReturnValue(false);
 });
 function assertBudgets() {
   for (const [system, prompt] of model.mock.calls)
@@ -254,5 +275,281 @@ describe("bounded long-meeting intelligence", () => {
       answerQuestion(segments, "漢".repeat(4_000), [], settings, getKey),
     ).rejects.toThrow("too long");
     expect(model).not.toHaveBeenCalled();
+  });
+});
+
+const richSettings = (): Settings => ({
+  ...settings,
+  llm: {
+    ...settings.llm,
+    provider: "openrouter",
+    model: "synthetic-image-model",
+    webSearch: true,
+    summaryDiagrams: true,
+    webSearchConsentProvider: "openrouter",
+    summaryDiagramsConsentProvider: "openrouter",
+  },
+});
+function liveCapabilities(overrides: Record<string, unknown> = {}) {
+  vi.mocked(supportsWebSearch).mockReturnValue(true);
+  vi.mocked(supportsImageOutput).mockReturnValue(true);
+  vi.mocked(discoverProviderModels).mockResolvedValue({
+    provider: "openrouter",
+    kind: "llm",
+    source: "account",
+    models: ["synthetic-image-model"],
+    message: "Synthetic account metadata",
+    capabilities: {
+      "synthetic-image-model": {
+        outputModalities: ["text", "image"],
+        webSearch: "supported",
+      },
+    },
+    ...overrides,
+  });
+}
+const diagramSegments: Segment[] = [
+  {
+    id: "flow",
+    start: 0,
+    end: 10,
+    text: "The request flows from the client to the queue and then to the worker.",
+    words: [],
+  },
+];
+const plan = () => ({
+  title: "Request flow",
+  description: "Client → queue → worker",
+  evidence: [{ segmentId: "flow", quote: diagramSegments[0].text }],
+});
+const notesResponse = (visualPlans: unknown[] = []) =>
+  JSON.stringify({
+    summary: "The team described the request flow.",
+    decisions: [],
+    actions: [],
+    visualPlans,
+  });
+
+describe("consented capability-gated rich intelligence", () => {
+  it("never discovers or calls web/image adapters when both opt-ins are off", async () => {
+    liveCapabilities();
+    const config = richSettings();
+    config.llm.webSearch = false;
+    config.llm.summaryDiagrams = false;
+    model.mockResolvedValue(notesResponse([plan()]));
+    await summarize(diagramSegments, config, getKey, () => {});
+    await answerQuestion(
+      diagramSegments,
+      "What is the flow?",
+      [],
+      config,
+      getKey,
+    );
+    expect(discoverProviderModels).not.toHaveBeenCalled();
+    expect(generateSummaryImage).not.toHaveBeenCalled();
+    expect(generateWebAnswer).not.toHaveBeenCalled();
+  });
+  it("requires consent bound to the selected provider even when flags and capabilities permit rich output", async () => {
+    liveCapabilities();
+    const config = richSettings();
+    config.llm.webSearchConsentProvider = "different-provider";
+    config.llm.summaryDiagramsConsentProvider = undefined;
+    await expect(
+      answerQuestion(segments, "Question", [], config, getKey),
+    ).rejects.toThrow("Confirm web search");
+    model.mockResolvedValue(notesResponse([plan()]));
+    const notes = await summarize(diagramSegments, config, getKey, () => {});
+    expect(notes.visuals).toBeUndefined();
+    expect(discoverProviderModels).not.toHaveBeenCalled();
+    expect(generateSummaryImage).not.toHaveBeenCalled();
+    expect(generateWebAnswer).not.toHaveBeenCalled();
+  });
+  it("rejects enabled web search when no adapter or verified model capability is available", async () => {
+    await expect(
+      answerQuestion(segments, "Question", [], richSettings(), getKey),
+    ).rejects.toThrow("no supported web-search adapter");
+    liveCapabilities({ source: "bundled" });
+    await expect(
+      answerQuestion(segments, "Question", [], richSettings(), getKey),
+    ).rejects.toThrow("could not be verified");
+    liveCapabilities({ models: ["different-model"] });
+    await expect(
+      answerQuestion(segments, "Question", [], richSettings(), getKey),
+    ).rejects.toThrow("could not be verified");
+    liveCapabilities({
+      capabilities: {
+        "synthetic-image-model": {
+          outputModalities: ["text"],
+          webSearch: "unknown",
+        },
+      },
+    });
+    await expect(
+      answerQuestion(segments, "Question", [], richSettings(), getKey),
+    ).rejects.toThrow("could not be verified");
+    expect(generateWebAnswer).not.toHaveBeenCalled();
+    expect(model).not.toHaveBeenCalled();
+  });
+  it("keeps web findings separate, preserves actual usage and citations, and bounds multilingual prompts", async () => {
+    liveCapabilities();
+    const sources = [
+      { title: "Public documentation", url: "https://example.com/docs" },
+    ];
+    vi.mocked(generateWebAnswer).mockResolvedValue({
+      text: "Meeting evidence: Maya owns the proposal. [s1]\nExternal web findings: documentation.",
+      webSources: sources,
+      webSearchUsed: true,
+    });
+    const long = [
+      ...segments,
+      {
+        id: "long",
+        start: 20,
+        end: 30,
+        text: "漢字🙂".repeat(10_000),
+        words: [],
+      },
+    ];
+    const answer = await answerQuestion(
+      long,
+      "Who owns the proposal and what does public documentation say?",
+      [{ role: "assistant", text: "History ".repeat(10_000) }],
+      richSettings(),
+      getKey,
+    );
+    expect(answer.citations).toEqual(["s1"]);
+    expect(answer.webSources).toEqual(sources);
+    expect(answer.webSearchUsed).toBe(true);
+    const [system, prompt] = vi.mocked(generateWebAnswer).mock.calls[0];
+    expect(system).toContain(
+      "separate Meeting evidence from External web findings",
+    );
+    expect(system).not.toContain("Use only what the transcript supports");
+    expect(Buffer.byteLength(system + prompt)).toBeLessThanOrEqual(
+      MAX_MODEL_INPUT_BYTES,
+    );
+    expect(model).not.toHaveBeenCalled();
+    vi.mocked(generateWebAnswer).mockResolvedValue({
+      text: "Meeting answer [s1]",
+      webSources: [],
+      webSearchUsed: false,
+    });
+    expect(
+      (
+        await answerQuestion(
+          segments,
+          "Who owns it?",
+          [],
+          richSettings(),
+          getKey,
+        )
+      ).webSearchUsed,
+    ).toBe(false);
+  });
+  it("generates at most one grounded diagram and never uses web search for summaries", async () => {
+    liveCapabilities();
+    model.mockResolvedValue(notesResponse([plan(), plan()]));
+    vi.mocked(generateSummaryImage).mockResolvedValue({
+      dataUrl: "data:image/png;base64,c3ludGhldGlj",
+      mimeType: "image/png",
+    });
+    const result = await summarize(
+      diagramSegments,
+      richSettings(),
+      getKey,
+      () => {},
+    );
+    expect(result.visuals).toHaveLength(1);
+    expect(result.visuals?.[0]).toMatchObject({
+      title: "Request flow",
+      mimeType: "image/png",
+    });
+    expect(generateSummaryImage).toHaveBeenCalledOnce();
+    expect(vi.mocked(generateSummaryImage).mock.calls[0][0]).toContain(
+      diagramSegments[0].text,
+    );
+    expect(model.mock.calls[0][1]).toContain("Do not force a visual");
+    expect(generateWebAnswer).not.toHaveBeenCalled();
+    assertBudgets();
+  });
+  it("skips unnecessary visuals and unverified image capabilities without interrupting notes", async () => {
+    liveCapabilities();
+    model.mockResolvedValue(notesResponse());
+    expect(
+      (await summarize(segments, richSettings(), getKey, () => {})).visuals,
+    ).toBeUndefined();
+    liveCapabilities({ source: "bundled" });
+    model.mockResolvedValue(notesResponse([plan()]));
+    await summarize(diagramSegments, richSettings(), getKey, () => {});
+    vi.mocked(discoverProviderModels).mockRejectedValue(new Error("offline"));
+    expect(
+      (await summarize(diagramSegments, richSettings(), getKey, () => {}))
+        .summary,
+    ).toContain("request flow");
+    expect(generateSummaryImage).not.toHaveBeenCalled();
+  });
+  it("rejects invented diagram source IDs and quotes while retaining notes", async () => {
+    liveCapabilities();
+    for (const evidence of [
+      [{ segmentId: "invented", quote: diagramSegments[0].text }],
+      [
+        {
+          segmentId: "flow",
+          quote: "The worker guarantees a million requests per second.",
+        },
+      ],
+    ]) {
+      model.mockResolvedValue(notesResponse([{ ...plan(), evidence }]));
+      const result = await summarize(
+        diagramSegments,
+        richSettings(),
+        getKey,
+        () => {},
+      );
+      expect(result.summary).toContain("request flow");
+      expect(result.visualError).toContain("evidence absent");
+    }
+    expect(generateSummaryImage).not.toHaveBeenCalled();
+  });
+  it("retains summary and action items when the image provider fails", async () => {
+    liveCapabilities();
+    model.mockResolvedValue(notesResponse([plan()]));
+    vi.mocked(generateSummaryImage).mockRejectedValue(
+      new Error("Image service unavailable"),
+    );
+    const result = await summarize(
+      diagramSegments,
+      richSettings(),
+      getKey,
+      () => {},
+    );
+    expect(result.summary).toContain("request flow");
+    expect(result.actions).toEqual([]);
+    expect(result.visualError).toContain("Image service unavailable");
+  });
+  it("budgets visual schema overhead while preserving every long-meeting section", async () => {
+    liveCapabilities();
+    const long = Array.from({ length: 80 }, (_, i) => ({
+      id: `s${i}`,
+      start: i,
+      end: i + 1,
+      text: "漢字🙂 Meeting evidence. ".repeat(100),
+      words: [],
+    }));
+    const seen = new Set<string>();
+    model.mockImplementation(async (_system, prompt) => {
+      const ids = [...new Set(prompt.match(/\[s\d+\]/g) || [])];
+      if (prompt.includes("TRANSCRIPT SECTION:")) {
+        ids.forEach((id) => seen.add(id));
+        return ids.join(" ") + " detail".repeat(200);
+      }
+      if (prompt.includes("ALL NOTES IN THIS GROUP:"))
+        return ids.join(" ") + " reduced".repeat(20);
+      for (let i = 0; i < 80; i++) expect(prompt).toContain(`[s${i}]`);
+      return notesResponse();
+    });
+    await summarize(long, richSettings(), getKey, () => {});
+    expect(seen.size).toBe(80);
+    assertBudgets();
   });
 });
