@@ -24,7 +24,7 @@ A browser can capture the microphone. System capture depends on the browser's sc
 
 ## Local models in the packaged app
 
-The packaged app includes the transcription helper script, but it does not embed a Python interpreter, Whisper model weights, or an Ollama server. Follow the project README's local-model setup, then set the **Python executable** setting to the absolute path of that environment's interpreter (for example `/Users/you/Projects/AIMeetingNotes/.venv/bin/python`). A virtual environment created on one machine is not portable to another. Keep Ollama running when using an Ollama language model. Initial Whisper transcription may download the selected model; subsequent runs reuse its local cache.
+The packaged app includes the transcription helper script, but it does not embed a Python interpreter, Whisper model weights, or an Ollama server. Follow the [developer guide's local-model setup](development.md#fresh-setup), then set the **Python executable** setting to the absolute path of that environment's interpreter (for example `/Users/you/Projects/AIMeetingNotes/.venv/bin/python`). A virtual environment created on one machine is not portable to another. Keep Ollama running when using an Ollama language model. Initial Whisper transcription may download the selected model; subsequent runs reuse its local cache.
 
 ## Capture implementation and validation boundary
 
