@@ -15,10 +15,10 @@ Your recordings and notes are saved on your Mac. Use AI on your computer or conn
 - **Record both sides of a call.** Capture your microphone and the audio playing on your computer, or choose just one.
 - **Use recordings you already have.** Upload common audio files, including MP3, M4A, and WAV.
 - **Read and listen together.** Follow the highlighted words during playback. Click a word or timestamp to jump to that part of the recording.
-- **Get the main points.** Read a summary, review decisions, and check off action items.
+- **Get clean, structured notes.** Read formatted summaries with headings, lists, formulas, tables, and simple charts when the meeting supports them. Review decisions and check off action items.
 - **Ask your meeting a question.** Try “What did we decide?” or “What do I need to do next?” Jump to the supporting audio from the answer.
 - **Add research and diagrams.** Enable web search for questions or useful summary diagrams in Settings when your chosen model supports them. Both start off.
-- **Keep a copy.** Export your notes and transcript, or download a generated diagram.
+- **Keep a copy.** Export your notes and transcript, download a diagram, or choose **Export LaTeX (.tex)** in the summary for an editable document.
 
 **Transcripts and notes are created after you save the recording**, not live during the call. Keep NoteThis open until your recording is saved. AI can make mistakes, so check important details against the audio.
 
@@ -50,6 +50,8 @@ If access is blocked, follow the app’s permission message or visit **System Se
 1. Load the sample meeting to explore without recording, or choose **Record meeting** or **Import audio**.
 2. For a call, choose your audio sources, start recording, then stop and save when finished. Headphones help prevent echo.
 3. Wait for the transcript and notes. Play the recording, review your actions, or open **Ask this meeting**.
+
+New summaries use LaTeX formatting automatically. To update an older summary, open it and click **Regenerate**. Formulas and data charts do not require an image-generating AI model.
 
 ## Choosing AI and keeping your data private
 

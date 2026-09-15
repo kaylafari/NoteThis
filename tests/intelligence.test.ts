@@ -553,3 +553,152 @@ describe("consented capability-gated rich intelligence", () => {
     assertBudgets();
   });
 });
+
+describe("LaTeX summary generation", () => {
+  it("requests a constrained LaTeX body with correctly escaped JSON, while keeping actions plain", async () => {
+    const summary = String.raw`\section{Measurements}
+\textbf{Force} is \(F = 12\,N\).
+\[F = ma\]
+\begin{tikzpicture}\begin{axis}[title={Measurements},xlabel={Time},ylabel={Force},ybar]\addplot coordinates {(1,12) (2,24)};\end{axis}\end{tikzpicture}`;
+    model.mockResolvedValue(
+      JSON.stringify({
+        summary,
+        decisions: ["Keep the measurements"],
+        actions: [
+          {
+            text: "Send proposal",
+            owner: "Maya",
+            due: "Friday",
+            segmentId: "s1",
+          },
+        ],
+      }),
+    );
+    const result = await summarize(
+      [
+        ...segments,
+        {
+          id: "measurements",
+          start: 10,
+          end: 20,
+          text: "Force F = ma. Force is 12 N at time 1 and 24 N at time 2.",
+          words: [],
+        },
+      ],
+      settings,
+      getKey,
+      () => {},
+    );
+    const prompt = model.mock.calls.at(-1)![1];
+    for (const directive of [
+      "LaTeX document BODY only",
+      "no preamble",
+      String.raw`\section{...}`,
+      String.raw`\subsection{...}`,
+      String.raw`\textbf{...}`,
+      String.raw`\emph{...}`,
+      "itemize/enumerate",
+      "tabular",
+      String.raw`\(...\)`,
+      String.raw`\[...\]`,
+      String.raw`\begin{tikzpicture}\begin{axis}`,
+      String.raw`\addplot coordinates {(x,y) ...};`,
+      "optional ybar",
+      "require explicit numerical data in the transcript",
+      "never invent values",
+      "only when supported by the meeting evidence",
+      "Keep decisions and all action fields as plain text",
+    ])
+      expect(prompt).toContain(directive);
+    expect(prompt).toContain(
+      "One LaTeX token encoded as a JSON string: " +
+        JSON.stringify(String.raw`\textbf{...}`),
+    );
+    expect(prompt).not.toContain(
+      "JSON escaping example (format only, not meeting evidence)",
+    );
+    expect(prompt).toContain(
+      "actual meeting facts, numerical values, and tasks",
+    );
+    expect(prompt).toContain(
+      "Extract every explicit task commitment into actions",
+    );
+    expect(result.summary).toBe(summary);
+    expect(result.summaryFormat).toBe("latex");
+    expect(result.decisions).toEqual(["Keep the measurements"]);
+    expect(result.actions[0]).toMatchObject({
+      text: "Send proposal",
+      owner: "Maya",
+      due: "Friday",
+    });
+    assertBudgets();
+  });
+
+  it("does not relabel imported or legacy summaries as LaTeX", () => {
+    for (const summary of [
+      "Plain meeting notes",
+      String.raw`\section{Looks like LaTeX}`,
+    ]) {
+      const result = parseInsight(
+        JSON.stringify({
+          summary,
+          decisions: [],
+          actions: [],
+          summaryFormat: "latex",
+        }),
+        segments,
+      );
+      expect(result.summary).toBe(summary);
+      expect(result.summaryFormat).toBeUndefined();
+    }
+  });
+
+  it("preserves quantitative evidence and every source through bounded long-meeting reductions", async () => {
+    const count = 40;
+    const quantitative = (i: number) =>
+      `[s${i}] F${i} = ${i} N; (${i},${i * 2})`;
+    const long = Array.from({ length: count }, (_, i) => ({
+      id: `s${i}`,
+      start: i,
+      end: i + 1,
+      text:
+        `F${i} = ${i} N; (${i},${i * 2}). ` +
+        "Recorded technical context. ".repeat(100),
+      words: [],
+    }));
+    const seen = new Set<number>();
+    let reductions = 0;
+    model.mockImplementation(async (_system, prompt) => {
+      const ids = [
+        ...new Set(
+          [...prompt.matchAll(/\[s(\d+)\]/g)].map((match) => Number(match[1])),
+        ),
+      ];
+      if (prompt.includes("TRANSCRIPT SECTION:")) {
+        expect(prompt).toContain(
+          "Preserve exact formulas, symbols, units, numerical data, coordinate pairs",
+        );
+        ids.forEach((id) => seen.add(id));
+        return ids.map(quantitative).join("\n") + " detail".repeat(250);
+      }
+      if (prompt.includes("ALL NOTES IN THIS GROUP:")) {
+        reductions++;
+        expect(prompt).toContain(
+          "Do not alter values, infer missing measurements, or invent formulas",
+        );
+        return ids.map(quantitative).join("\n");
+      }
+      for (let i = 0; i < count; i++) expect(prompt).toContain(quantitative(i));
+      return JSON.stringify({
+        summary: String.raw`\section{Measurements}Evidence retained.`,
+        decisions: [],
+        actions: [],
+      });
+    });
+    const result = await summarize(long, settings, getKey, () => {});
+    expect(seen.size).toBe(count);
+    expect(reductions).toBeGreaterThan(0);
+    expect(result.summaryFormat).toBe("latex");
+    assertBudgets();
+  });
+});

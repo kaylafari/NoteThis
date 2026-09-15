@@ -3761,3 +3761,203 @@ textarea::placeholder {
   color: #7b6044;
   margin-top: 14px;
 }
+
+.latex-summary {
+  color: #454549;
+  font-size: 13px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.latex-summary > p {
+  margin: 0 0 17px;
+  white-space: pre-wrap;
+}
+.latex-summary h3,
+.latex-summary h4,
+.latex-summary h5 {
+  color: #303033;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 25px 0 12px;
+  letter-spacing: -0.015em;
+}
+.latex-summary h3 {
+  font-size: 17px;
+}
+.latex-summary h4 {
+  font-size: 15px;
+}
+.latex-summary h5 {
+  font-size: 13px;
+}
+.latex-summary > :first-child {
+  margin-top: 0;
+}
+.latex-summary > ul,
+.latex-summary > ol {
+  padding-left: 24px;
+  margin: 12px 0 20px;
+}
+.latex-summary li {
+  padding-left: 3px;
+  margin: 5px 0;
+}
+.latex-display-container {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 5px 10px;
+  margin: 16px 0;
+  border-radius: 7px;
+  background: #fafafa;
+}
+.latex-summary .katex {
+  font-size: 1.12em;
+}
+.latex-summary .katex-display {
+  margin: 0.7em 0;
+}
+.latex-fallback {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  padding: 12px 14px;
+  margin: 15px 0;
+  color: #665440;
+  background: #f5f1ec;
+  border: 1px solid #e8ded0;
+  border-radius: 7px;
+}
+.latex-math-fallback {
+  display: inline;
+  padding: 2px 5px;
+}
+.latex-table-scroll {
+  overflow-x: auto;
+  margin: 18px 0;
+  max-width: 100%;
+}
+.latex-summary table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+}
+.latex-summary th,
+.latex-summary td {
+  border: 1px solid #e3e3e6;
+  padding: 9px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.latex-summary th {
+  background: #f5f4f2;
+  font-weight: 600;
+}
+.latex-summary caption {
+  font-size: 11px;
+  text-align: left;
+  color: #606065;
+  padding: 0 0 8px;
+}
+.latex-chart {
+  margin: 24px 0;
+  border: 1px solid #e3e3e6;
+  border-radius: 9px;
+  padding: 17px;
+  background: #fff;
+}
+.latex-chart > figcaption {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.latex-chart > svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.latex-chart svg text {
+  fill: #606065;
+  font-family: inherit;
+  font-size: 10px;
+}
+.latex-chart svg .latex-axis-label {
+  fill: #454549;
+  font-size: 11px;
+}
+.latex-chart-grid {
+  stroke: #e9e9ec;
+  stroke-width: 1;
+}
+.latex-chart-axis {
+  stroke: #9c9690;
+  stroke-width: 1;
+}
+.latex-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  list-style: none;
+  padding: 0;
+  margin: 5px 0 12px;
+  font-size: 10px;
+}
+.latex-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+}
+.latex-chart-legend span {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.latex-chart-data summary,
+.summary-source summary {
+  cursor: pointer;
+  color: #665440;
+  font-size: 11px;
+}
+.latex-chart-data summary:focus-visible,
+.summary-source summary:focus-visible {
+  outline: 2px solid #8a745c;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.latex-render-notice {
+  font-size: 11px;
+  color: #665440;
+  margin-top: 15px;
+}
+.summary-export {
+  margin: 22px 0 16px;
+  border-top: 1px solid #e3e3e6;
+  padding-top: 16px;
+}
+.summary-export > .inline-link {
+  font-size: 11px;
+}
+.summary-source {
+  margin-top: 12px;
+}
+.summary-source pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  line-height: 1.8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 12px 14px;
+  border: 1px solid #e3e3e6;
+  border-radius: 7px;
+  background: #fafafa;
+  color: #606065;
+  max-height: 320px;
+  overflow-y: auto;
+}

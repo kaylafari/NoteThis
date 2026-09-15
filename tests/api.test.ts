@@ -450,3 +450,55 @@ describe("generated summary diagram delivery", () => {
     expect(markdown).not.toContain("Missing test resource");
   });
 });
+
+describe("LaTeX summary export", () => {
+  it("downloads a LaTeX document while preserving the existing Markdown endpoint", async () => {
+    await writeFile(
+      path.join(dataDir, "meetings", "latex-fixture.json"),
+      JSON.stringify({
+        id: "latex-fixture",
+        title: "R&D notes",
+        createdAt: new Date().toISOString(),
+        duration: 1,
+        status: "ready",
+        audioFile: "fixture.wav",
+        segments: [],
+        messages: [],
+        insight: {
+          summary: String.raw`\section{Model}
+The stated relationship is \(E=mc^2\).
+\[y=\frac{x}{2}\]`,
+          summaryFormat: "latex",
+          decisions: ["Review A&B"],
+          actions: [],
+        },
+      }),
+    );
+    const response = await request(
+      "/meetings/latex-fixture/export?format=latex",
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/x-tex");
+    expect(response.headers.get("content-disposition")).toContain(
+      "meeting-latex-fixture.tex",
+    );
+    const tex = await response.text();
+    expect(tex).toContain(String.raw`\begin{document}`);
+    expect(tex).toContain(String.raw`\end{document}`);
+    expect(tex).toContain(String.raw`R\&D notes`);
+    expect(tex).toContain(String.raw`\frac{x}{2}`);
+    expect(tex).toContain(String.raw`Review A\&B`);
+    expect(
+      (await request("/meetings/latex-fixture/export")).headers.get(
+        "content-type",
+      ),
+    ).toContain("text/markdown");
+  });
+  it("exports older plain summaries without interpreting them as commands", async () => {
+    const response = await request(
+      "/meetings/visual-fixture/export?format=latex",
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain(String.raw`\begin{document}`);
+  });
+});

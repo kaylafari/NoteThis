@@ -171,7 +171,11 @@ export const insightSchema: Record<string, unknown> = {
   },
   required: ["summary", "decisions", "actions"],
 };
-const finalPrefix = `Write a concise factual meeting summary and extract explicit decisions and action commitments from the evidence below. Each action must describe a real task from the meeting. Copy the exact owner name, deadline, and source segment ID when stated; otherwise use an empty string. Never invent a task, owner, or date. Use empty arrays when no decisions or actions were stated. Return only JSON matching this schema:\n${JSON.stringify(insightSchema)}\n\nTRANSCRIPT EVIDENCE:\n`;
+const latexInstructions = String.raw`Write the summary field as a LaTeX document BODY only: no preamble, documentclass, usepackage, document environment, custom macros, external files, or Markdown fences. Use \section{...}, \subsection{...}, \textbf{...}, \emph{...}, itemize/enumerate lists, and tabular tables where helpful. Write inline math as \(...\) and display math as \[...\]. Include formulas only when supported by the meeting evidence; preserve exact symbols, units, and numerical values. Escape LaTeX special characters in prose. Charts are optional and require explicit numerical data in the transcript; never invent values, extrapolate missing measurements, or add an unnecessary chart. The only supported chart syntax is \begin{tikzpicture}\begin{axis}[title={...},xlabel={...},ylabel={...}]\addplot coordinates {(x,y) ...};\end{axis}\end{tikzpicture}, with optional ybar in the axis options for bars. Replace x,y with explicit supported numeric values; do not emit placeholders or unsupported plotting commands. Keep decisions and all action fields as plain text, not LaTeX. Return valid JSON: every literal LaTeX backslash must be escaped as a double backslash in JSON strings. `;
+const latexEscapedToken = JSON.stringify(String.raw`\textbf{...}`);
+const preserveQuantitativeEvidence =
+  "Preserve exact formulas, symbols, units, numerical data, coordinate pairs, and associated labels when stated, with their source segment IDs. Do not alter values, infer missing measurements, or invent formulas. ";
+const finalPrefix = `Write a concise factual meeting summary and extract explicit decisions and action commitments from the evidence below. Each action must describe a real task from the meeting. Copy the exact owner name, deadline, and source segment ID when stated; otherwise use an empty string. Never invent a task, owner, or date. Use empty arrays when no decisions or actions were stated. ${latexInstructions}One LaTeX token encoded as a JSON string: ${latexEscapedToken}. This illustrates escaping only; do not copy placeholder text. Your summary must report the actual meeting facts, numerical values, and tasks from the evidence below. Never return generic headings in place of meeting content. Extract every explicit task commitment into actions, with its stated owner and deadline.\nReturn only JSON matching this schema:\n${JSON.stringify(insightSchema)}\n\nTRANSCRIPT EVIDENCE:\n`;
 const extractPrefix =
   "Extract a concise factual account of this section, explicit decisions, and explicit action commitments. Preserve exact source segment IDs in brackets, owners and dates when stated. Aim for under 2000 characters. Do not add facts.\n\nTRANSCRIPT SECTION:\n";
 const reducePrefix =
@@ -315,9 +319,13 @@ export async function summarize(
         .replace("Return only JSON", visualInstructions + "Return only JSON")
     : finalPrefix;
   const extractionPrefix =
-    (allowVisual ? preserveVisualEvidence : "") + extractPrefix;
+    preserveQuantitativeEvidence +
+    (allowVisual ? preserveVisualEvidence : "") +
+    extractPrefix;
   const reductionPrefix =
-    (allowVisual ? preserveVisualEvidence : "") + reducePrefix;
+    preserveQuantitativeEvidence +
+    (allowVisual ? preserveVisualEvidence : "") +
+    reducePrefix;
   const evidenceBudget =
     MAX_MODEL_INPUT_BYTES -
     bytes(system) -
@@ -380,6 +388,8 @@ export async function summarize(
     { jsonSchema: schema },
   );
   const insight = parseInsight(raw, segments);
+  // Only this new generation path promises LaTeX; imported/older notes retain their format.
+  insight.summaryFormat = "latex";
   if (allowVisual) {
     try {
       const plan = visualPlan(raw, segments);

@@ -26,6 +26,8 @@ export type SummaryVisual = {
 };
 export type Insight = {
   summary: string;
+  /** Absent on older, plain-text summaries. */
+  summaryFormat?: "latex";
   decisions: string[];
   actions: ActionItem[];
   visuals?: SummaryVisual[];

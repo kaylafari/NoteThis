@@ -1,6 +1,6 @@
 {
   "name": "aim-meeting-notes",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Local-first meeting recorder with synchronized transcripts and meeting intelligence",
@@ -25,6 +25,7 @@
     "@mariozechner/pi-ai": "latest",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "katex": "^0.18.7",
     "lucide-react": "^0.468.0",
     "multer": "^2.0.2",
     "react": "^19.1.0",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/katex": "^0.16.8",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.0",

@@ -1,3 +1,4 @@
+import { exportLatexMeeting } from "../shared/latex.js";
 import express from "express";
 import multer from "multer";
 import { z } from "zod";
@@ -533,6 +534,14 @@ export async function startServer(options: ServerOptions = {}) {
   });
   app.get("/api/meetings/:id/export", async (req, res) => {
     const m = await getMeeting(req.params.id);
+    if (req.query.format === "latex") {
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="meeting-${m.id}.tex"`,
+      );
+      res.type("application/x-tex").send(exportLatexMeeting(m));
+      return;
+    }
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="meeting-${m.id}.md"`,

@@ -58,6 +58,8 @@ import type {
   Segment,
 } from "../shared/types";
 import { api } from "./api";
+import { LatexSummary } from "./LatexSummary";
+import { exportLatexMeeting } from "../shared/latex";
 import { openExternalLink } from "./external-links";
 import { createCallRecorder, type RecorderState } from "./recorder";
 
@@ -376,6 +378,20 @@ export default function App() {
     } catch (e) {
       setError(`Cannot play this audio: ${(e as Error).message}`);
     }
+  }
+  function exportLatex() {
+    if (!meeting?.insight) return;
+    const url = URL.createObjectURL(
+      new Blob([exportLatexMeeting(meeting)], {
+        type: "application/x-tex;charset=utf-8",
+      }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${meeting.title.replace(/[^a-z0-9 -]/gi, "") || "meeting"}.tex`;
+    link.click();
+    // Give the browser time to begin the download before releasing the URL.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function exportNotes() {
     if (!meeting) return;
@@ -900,9 +916,24 @@ export default function App() {
                           </button>
                         </div>
                         <h2>A conversation, distilled.</h2>
-                        <p className="summary-copy">
-                          {meeting.insight.summary}
-                        </p>
+                        {meeting.insight.summaryFormat === "latex" ? (
+                          <LatexSummary source={meeting.insight.summary} />
+                        ) : (
+                          <p className="summary-copy">
+                            {meeting.insight.summary}
+                          </p>
+                        )}
+                        <div className="summary-export">
+                          <button className="inline-link" onClick={exportLatex}>
+                            <ArrowDownToLine size={14} /> Export LaTeX (.tex)
+                          </button>
+                          {meeting.insight.summaryFormat === "latex" && (
+                            <details className="summary-source">
+                              <summary>View LaTeX source</summary>
+                              <pre>{meeting.insight.summary}</pre>
+                            </details>
+                          )}
+                        </div>
                         <div className="section-divider" />
                         <div className="section-label">
                           <span className="small-icon">
