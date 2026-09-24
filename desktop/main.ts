@@ -12,6 +12,7 @@ import {
 } from "electron";
 import path from "node:path";
 import { preserveDesktopIdentity, showProductName } from "./identity";
+import { createSecretCodec } from "./secret-codec";
 import { appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { launchExternal, registerExternalLinks } from "./external-links";
 import { pathToFileURL } from "node:url";
@@ -312,27 +313,7 @@ else {
         pathToFileURL(path.join(app.getAppPath(), "dist-server", "index.mjs"))
           .href
       );
-      const secretCodec = {
-        encrypt(value: string) {
-          if (
-            !safeStorage.isEncryptionAvailable() ||
-            (process.platform === "linux" &&
-              safeStorage.getSelectedStorageBackend() === "basic_text")
-          ) {
-            throw new Error(
-              "The operating system secure credential store is unavailable. Unlock your keychain or configure a system keyring before saving provider credentials.",
-            );
-          }
-          return safeStorage.encryptString(value).toString("base64");
-        },
-        decrypt(value: string) {
-          if (!safeStorage.isEncryptionAvailable())
-            throw new Error(
-              "Unlock the operating system credential store to access saved credentials.",
-            );
-          return safeStorage.decryptString(Buffer.from(value, "base64"));
-        },
-      };
+      const secretCodec = createSecretCodec(safeStorage, process.platform);
       server = await serverModule.startServer({
         port: 0,
         dataDir: app.getPath("userData"),

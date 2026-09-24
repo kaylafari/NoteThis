@@ -18,8 +18,8 @@ import { decodeVisual, visualFilename } from "./visual-storage.js";
 import type { Meeting, Settings, SettingsUpdate } from "../shared/types.js";
 
 export type SecretCodec = {
-  encrypt: (value: string) => string;
-  decrypt: (value: string) => string;
+  encrypt: (value: string) => string | Promise<string>;
+  decrypt: (value: string) => string | Promise<string>;
 };
 export const defaultSettings: Settings = {
   stt: { provider: "local", model: "base", language: "" },
@@ -277,7 +277,7 @@ export class Store {
     const work = this.secretQueue.then(async () => {
       if (!value) delete this.secrets[name];
       else if (this.codec)
-        this.secrets[name] = `os:${this.codec.encrypt(value)}`;
+        this.secrets[name] = `os:${await this.codec.encrypt(value)}`;
       else {
         const iv = randomBytes(12);
         const cipher = createCipheriv("aes-256-gcm", this.key, iv);

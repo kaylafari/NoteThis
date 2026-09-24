@@ -57,6 +57,48 @@ describe("private local storage", () => {
     await next.setSecret("api:p0", "");
     expect(await next.getSecret("api:p0")).toBeUndefined();
   });
+  it("awaits asynchronous OS encryption and decryption across restart", async () => {
+    const codec = {
+      encrypt: async (value: string) =>
+        Buffer.from(`fixture:${value}`).toString("base64"),
+      decrypt: async (value: string) =>
+        Buffer.from(value, "base64").toString().slice(8),
+    };
+    const store = new Store(dir, codec);
+    await store.init();
+    await Promise.all([
+      store.setSecret("api:first", "synthetic-one"),
+      store.setSecret("api:second", "synthetic-two"),
+    ]);
+    const saved = await readFile(path.join(dir, "secrets.json"), "utf8");
+    expect(saved).not.toContain("[object Promise]");
+    expect(saved).not.toContain("synthetic-one");
+    expect(JSON.parse(saved)["api:first"]).toMatch(/^os:/);
+    const next = new Store(dir, codec);
+    await next.init();
+    expect(await next.getSecret("api:first")).toBe("synthetic-one");
+    expect(await next.getSecret("api:second")).toBe("synthetic-two");
+  });
+  it("preserves existing credentials on async encryption rejection and lets later writes recover", async () => {
+    const codec = {
+      encrypt: async (value: string) => {
+        if (value === "rejected") throw new Error("Keychain denied");
+        return Buffer.from(value).toString("base64");
+      },
+      decrypt: async (value: string) => Buffer.from(value, "base64").toString(),
+    };
+    const store = new Store(dir, codec);
+    await store.init();
+    await store.setSecret("api:first", "existing");
+    const before = await readFile(path.join(dir, "secrets.json"), "utf8");
+    await expect(store.setSecret("api:first", "rejected")).rejects.toThrow(
+      "Keychain denied",
+    );
+    expect(await readFile(path.join(dir, "secrets.json"), "utf8")).toBe(before);
+    expect(await store.getSecret("api:first")).toBe("existing");
+    await store.setSecret("api:second", "recovered");
+    expect(await store.getSecret("api:second")).toBe("recovered");
+  });
   it("marks interrupted jobs retryable without losing audio references", async () => {
     const store = new Store(dir);
     await store.init();
