@@ -43,7 +43,7 @@ Setup needs internet access. Once the local AI models are downloaded, local tran
 3. If you installed **Ollama** separately, open it first. A project-local copy starts automatically.
 4. On your first recording, allow **Microphone** and **Screen & System Audio Recording** access when requested. NoteThis saves audio, not screen video.
 
-If access is blocked, follow the app’s permission message or visit **System Settings → Privacy & Security**, then reopen NoteThis. See [recording help](docs/recording.md).
+If access is blocked, follow the app’s permission message or visit **System Settings → Privacy & Security**, then reopen NoteThis. See [recording help](docs/recording.md). If Keychain keeps asking, choose **Always Allow** instead of **Allow**; see [remembering permissions](docs/permissions-persistence.md).
 
 ## Try your first meeting
 

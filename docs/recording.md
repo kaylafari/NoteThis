@@ -16,7 +16,7 @@ On macOS 14.2 and later, current Electron uses Apple's Core Audio Tap API. A pac
 
 Launching with `npm run desktop` runs Electron from your terminal. macOS can attribute the system-audio permission to that terminal or IDE, which then needs the permission and usage-description key itself. For the most reliable permission experience, run `npm run package` and open **NoteThis.app** in the `release` directory. Electron can return an ended or silent audio track when macOS permission is missing, so confirm actual activity on the system meter while another app is playing audio.
 
-The old `MacCatapLoopbackAudioForScreenShare` override is deliberately unused: modern Electron uses Core Audio Tap and future Chromium versions remove the override. macOS 12 and older lack the required native capture path. macOS 13 support depends on the Chromium capture implementation; macOS 14.2 or newer is recommended for this app. This repository builds a locally ad-hoc-signed application without using a developer certificate; distribution to other Macs requires Developer ID signing and notarization.
+The old `MacCatapLoopbackAudioForScreenShare` override is deliberately unused: modern Electron uses Core Audio Tap and future Chromium versions remove the override. macOS 12 and older lack the required native capture path. macOS 13 support depends on the Chromium capture implementation; macOS 14.2 or newer is recommended for this app. This repository builds with a persistent local signing identity after `npm run setup:signing`; distribution to other Macs requires Developer ID signing and notarization. See [remembering permissions](permissions-persistence.md).
 
 ## Browser recording
 

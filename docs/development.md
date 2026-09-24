@@ -15,6 +15,7 @@ npm run desktop
 The double-click launcher opens the packaged macOS application and starts the project-local Ollama runtime when available and no Ollama service is already listening. `npm run desktop` builds and opens the development version. Rebuild the packaged application after changing source code:
 
 ```sh
+npm run setup:signing # once on this Mac; future packages reuse this identity
 npm run package
 node scripts/launch.mjs --packaged
 ```
@@ -40,7 +41,7 @@ npm run desktop
 
 In **Settings → Local setup**, set Python executable to the absolute `.venv/bin/python` path printed by the setup script. This path must point to the environment on the Mac being set up. Whisper downloads the selected weights on first transcription. Network access is needed for initial model downloads; local processing can then work offline.
 
-After confirming the app works, close the development app and run `npm run package` to create the Mac application. Future launches can use **Launch NoteThis.command**. Keep the project folder and its local dependencies in place; the app bundle does not include Python, model downloads, or the Ollama service. Start the separately installed Ollama app before launching NoteThis unless a project-local runtime has been configured.
+After confirming the app works, close the development app and run `npm run setup:signing` once and then `npm run package` to create the Mac application. Future launches can use **Launch NoteThis.command**. Keep the project folder and its local dependencies in place; the app bundle does not include Python, model downloads, or the Ollama service. Start the separately installed Ollama app before launching NoteThis unless a project-local runtime has been configured.
 
 Default models:
 
@@ -98,7 +99,7 @@ npm run package      # Apple Silicon .app under release/
 
 The synthetic encoder test uses generated tones, not your microphone or actual system audio. It verifies both tones survive mixing and encoding and that no video is saved. Browser-only preview capture depends on browser/OS sharing support; use the desktop app for computer-wide call audio.
 
-Cloud providers are contract-tested with mocked responses. Actual provider billing/account access and OS microphone/system-audio permission grants need verification with your account and device. App signing/notarization for redistribution is not configured; the local build is for development/personal use.
+Cloud providers are contract-tested with mocked responses. Actual provider billing/account access and OS microphone/system-audio permission grants need verification with your account and device. A persistent local signing identity is used for personal builds; Apple Developer ID signing/notarization for public redistribution is not configured. See [permission persistence](permissions-persistence.md).
 
 Architecture: React + TypeScript/Vite renderer; isolated Electron main/preload; localhost Express API; atomic local JSON records; Python faster-whisper bridge; Ollama and pi-ai adapters. Background jobs run sequentially to limit local model contention. See [verification notes](verification.md) for the final observed checks.
 

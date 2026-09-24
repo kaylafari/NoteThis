@@ -19,6 +19,7 @@ extraResources:
       - "*.py"
       - "*.txt"
 asar: true
+afterSign: scripts/sign-local-mac.cjs
 mac:
   icon: assets/notethis.icns
   category: public.app-category.productivity

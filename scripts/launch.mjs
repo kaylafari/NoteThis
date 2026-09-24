@@ -3,6 +3,14 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const packaged = path.join(root, "release", "mac-arm64", "NoteThis.app");
+const usePackaged = process.argv.includes("--packaged");
+if (usePackaged && !existsSync(packaged)) {
+  console.error(
+    "NoteThis is not packaged yet. Run npm run setup:signing once, then npm run package. The launcher will not substitute a development app because macOS permissions belong to the signed app.",
+  );
+  process.exit(1);
+}
 let ownedOllama;
 try {
   const response = await fetch("http://127.0.0.1:11434/api/tags", {
@@ -27,8 +35,6 @@ try {
       "Start Ollama to use local meeting intelligence, or choose a cloud model in Settings.",
     );
 }
-const packaged = path.join(root, "release", "mac-arm64", "NoteThis.app");
-const usePackaged = process.argv.includes("--packaged") && existsSync(packaged);
 const executable = usePackaged
   ? "/usr/bin/open"
   : (await import("electron")).default;
