@@ -71,3 +71,12 @@ Actual Keychain dialog acceptance and recording grants remain manual checks. **A
 The persistent identity was created in a dedicated local build keychain. Two different native executable fixtures signed with that identity had different code hashes but the same certificate-based designated requirement, and both passed strict signature verification. Signing temporarily includes only the dedicated chain in the search list, removes its own addition afterward, and relocks the chain; tests cover failure cleanup and preserving other entries.
 
 The final Apple Silicon NoteThis 0.4.1 package passed `codesign --verify --deep --strict`. Its designated requirement uses the unchanged bundle identifier and saved certificate leaf, without a code-hash requirement. Packaged main/preload/server/HTML files match the production build, and the packaged version is 0.4.1.
+
+
+## Subscription model refresh — October 5, 2026
+
+Reproduced a forced refresh on 0.4.1 returning only `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. The legacy subscription catalog was receiving Codex client version `0.154.0`; reconnecting did not change that version. Version 0.4.2 updates the protocol to `0.159.2` while preserving the existing OAuth adapter and account-scoped cache behavior.
+
+The signed packaged app's forced refresh with the same connected account returned seven models, including the previously missing `gpt-6.1-sol`, `gpt-6-sol`, and `gpt-6-luna`. These IDs came from the authenticated provider response, not a new hardcoded list. The current selected model and account connection were preserved; this check sent no meeting content and did not test inference or quota.
+
+All **390 tests across 25 files**, TypeScript, production build, and strict package-signature verification passed. The signed app was reopened for testing. A public OAuth catalog endpoint was also checked during diagnosis, but rejected these existing credentials with HTTP 403; the shipped repair retains the compatible subscription endpoint.
