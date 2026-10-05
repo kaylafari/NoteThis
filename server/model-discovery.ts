@@ -25,8 +25,9 @@ type Entry = {
 const cache = new Map<string, Entry>();
 const TTL = 60_000;
 // Public protocol reference: openai/codex codex-rs/codex-api/src/endpoint/models.rs.
-// Version tracks its rust-v0.154.0 release; originator matches pi-ai's generation adapter.
-export const CODEX_DISCOVERY_VERSION = "0.154.0";
+// Catalog visibility is version-gated. Keep this protocol version aligned with
+// a verified current Codex client; originator matches pi-ai's generation adapter.
+export const CODEX_DISCOVERY_VERSION = "0.159.2";
 const record = (v: unknown): Item =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Item) : {};
 const text = (v: unknown) => (typeof v === "string" ? v : "");

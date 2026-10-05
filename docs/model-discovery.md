@@ -10,6 +10,12 @@ The request adapter accepts supported model IDs returned by discovery, including
 
 Discovery confirms a source's catalog response. It does not guarantee sufficient quota or that every request will succeed. ChatGPT subscription model availability and an OpenAI API-key catalog are distinct and are queried with their corresponding credentials.
 
+## Subscription catalog compatibility
+
+The existing ChatGPT browser sign-in adapter uses the Codex subscription catalog. That endpoint gates model visibility by `client_version`, so refreshing or reconnecting cannot reveal models hidden from an older protocol version. Keep `CODEX_DISCOVERY_VERSION` aligned with a verified current Codex client when updating the adapter; never fill in missing models from a guessed list. Version 0.4.2 updates that value from `0.154.0` to `0.159.2`. Forced refresh still performs a fresh authenticated request, and newly returned IDs do not need entries in the bundled registry.
+
+The newer [Sign in with ChatGPT public catalog](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference) is a different integration path. A live check with this installation's existing browser credentials returned HTTP 403 there, so this repair retains the working Codex endpoint rather than silently switching authentication flows.
+
 ## Observed verification
 
 On September 14, 2026, the packaged app queried the connected ChatGPT account successfully and returned six models: `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, and `gpt-5.3-codex-spark`. None of the obsolete GPT-5.1 picker entries appeared. This is a dated verification record, not an application model list. The saved local-model preference and existing account connection were preserved, and no meeting content was sent by the discovery check.

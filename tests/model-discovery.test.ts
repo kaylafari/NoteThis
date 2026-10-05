@@ -178,6 +178,30 @@ describe("connected model discovery", () => {
     expect(JSON.stringify(result)).not.toContain("account-a");
     expect(JSON.stringify(result)).not.toContain("private-refresh");
   });
+  it("refreshes the subscription catalog using the current protocol version rather than the legacy catalog", async () => {
+    connect();
+    fetchMock.mockImplementation(async (url: string) =>
+      json({
+        models: [
+          {
+            slug:
+              new URL(url).searchParams.get("client_version") === "0.159.2"
+                ? "gpt-future-new"
+                : "gpt-legacy",
+            visibility: "list",
+          },
+        ],
+      }),
+    );
+    const result = await discoverProviderModels(
+      "openai-codex",
+      "llm",
+      settings,
+      key,
+      { force: true },
+    );
+    expect(result.models).toEqual(["gpt-future-new"]);
+  });
   it("never substitutes API credentials or bundled models for a missing ChatGPT connection", async () => {
     const result = await discoverProviderModels(
       "openai-codex",
