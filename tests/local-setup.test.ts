@@ -254,6 +254,37 @@ describe("local preparation", () => {
     await manager.close();
     expect(f.kill).toHaveBeenCalledWith("SIGTERM");
   });
+  it("allows a first service startup longer than 20 seconds without restarting it", async () => {
+    vi.useFakeTimers();
+    const f = fixture(true);
+    f.setHealthy(false);
+    let finish!: () => void;
+    const exited = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    f.dependencies.spawnService.mockImplementation(() => ({
+      kill: () => finish(),
+      exited,
+    }));
+    const manager = f.make();
+    let ready = false;
+    const starting = manager.startService().then(() => {
+      ready = true;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(21_000);
+      expect(ready).toBe(false);
+      expect(f.dependencies.spawnService).toHaveBeenCalledTimes(1);
+      f.setHealthy(true);
+      await vi.advanceTimersByTimeAsync(500);
+      await starting;
+      expect(ready).toBe(true);
+      expect(f.dependencies.spawnService).toHaveBeenCalledTimes(1);
+    } finally {
+      await manager.close();
+      vi.useRealTimers();
+    }
+  });
   it("cancels an active Python model download and persists retryable state", async () => {
     const f = fixture();
     const manager = f.make();

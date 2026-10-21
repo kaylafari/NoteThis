@@ -288,7 +288,8 @@ export function createLocalSetup(options: LocalSetupOptions) {
           if (owned === service) owned = undefined;
         });
       }
-      const deadline = Date.now() + 20_000;
+      // First launch may spend a minute initializing native inference libraries.
+      const deadline = Date.now() + 120_000;
       while (Date.now() < deadline) {
         try {
           await tags();
@@ -462,6 +463,11 @@ export function createLocalSetup(options: LocalSetupOptions) {
       ]);
       await command(bin("ffmpeg"), ["-version"]);
       await command(bin("ffprobe"), ["-version"]);
+      update({
+        state: "running",
+        stage: "runtime",
+        message: "Starting local AI. The first launch may take a minute…",
+      });
       await ensureService();
       update({
         state: "running",
