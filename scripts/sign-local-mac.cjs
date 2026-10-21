@@ -1,6 +1,31 @@
 const path = require("node:path");
 const { lstat, realpath } = require("node:fs/promises");
+const { openSync, readSync, closeSync, statSync } = require("node:fs");
 const { pathToFileURL } = require("node:url");
+
+// Seal runtime data through the outer bundle signature; sign executable Mach-O
+// files individually. Python bytecode, wheel metadata and model data are not code.
+function skipRuntimeData(file, app) {
+  const runtime = path.join(app, "Contents", "Resources", "runtime") + path.sep;
+  if (!file.startsWith(runtime) || !statSync(file).isFile()) return false;
+  const fd = openSync(file, "r");
+  try {
+    const magic = Buffer.alloc(4);
+    if (readSync(fd, magic, 0, 4, 0) !== 4) return true;
+    return ![
+      "feedface",
+      "cefaedfe",
+      "feedfacf",
+      "cffaedfe",
+      "cafebabe",
+      "bebafeca",
+      "cafebabf",
+      "bfbafeca",
+    ].includes(magic.toString("hex"));
+  } finally {
+    closeSync(fd);
+  }
+}
 
 /** electron-builder afterSign hook; dependencies are injectable for no-keychain tests. */
 async function signLocalMac(context, dependencies = {}) {
@@ -56,6 +81,7 @@ async function signLocalMac(context, dependencies = {}) {
         identity: verified.fingerprint,
         keychain: verified.keychainPath,
         identityValidation: false,
+        ignore: (file) => skipRuntimeData(file, app),
         preAutoEntitlements: false,
         preEmbedProvisioningProfile: false,
         optionsForFile: () => ({
@@ -96,3 +122,5 @@ async function signLocalMac(context, dependencies = {}) {
 }
 module.exports = signLocalMac;
 module.exports.signLocalMac = signLocalMac;
+
+module.exports.skipRuntimeData = skipRuntimeData;

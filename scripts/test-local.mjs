@@ -4,7 +4,10 @@ import os from "node:os";
 import assert from "node:assert/strict";
 import { startServer } from "../dist-server/index.mjs";
 const dir = await mkdtemp(path.join(os.tmpdir(), "cadence-local-smoke-"));
-const server = await startServer({ port: 0, dataDir: dir });
+const runtimeDir = process.env.NOTETHIS_TEST_RUNTIME
+  ? path.resolve(process.env.NOTETHIS_TEST_RUNTIME)
+  : undefined;
+const server = await startServer({ port: 0, dataDir: dir, runtimeDir });
 const base = `http://127.0.0.1:${server.port}/api`;
 const headers = { "X-Meeting-App": "1", "Content-Type": "application/json" };
 const request = async (route, init) => {
@@ -14,13 +17,26 @@ const request = async (route, init) => {
   return body;
 };
 try {
+  if (runtimeDir) {
+    await request("/local-setup", { method: "POST", headers, body: "{}" });
+    const deadline = Date.now() + 45 * 60_000;
+    let status;
+    let message = "";
+    do {
+      status = await request("/local-setup");
+      if (status.message !== message) console.log((message = status.message));
+      if (status.state !== "running") break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    } while (Date.now() < deadline);
+    assert.equal(status.state, "ready", status.message);
+  }
   await request("/settings", {
     method: "PUT",
     headers,
     body: JSON.stringify({
       local: {
         whisperModel: "base",
-        pythonPath: path.resolve(".venv/bin/python"),
+        pythonPath: runtimeDir ? ".venv/bin/python" : path.resolve(".venv/bin/python"),
         ollamaUrl: process.env.OLLAMA_HOST || "http://127.0.0.1:11434",
       },
     }),

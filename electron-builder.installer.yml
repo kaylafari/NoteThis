@@ -1,0 +1,27 @@
+extends: ./electron-builder.yml
+directories:
+  output: release/installer
+extraResources:
+  - from: build/runtime
+    to: runtime
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  minimumSystemVersion: "14.2"
+  artifactName: "NoteThis-${version}-mac-arm64.${ext}"
+dmg:
+  title: NoteThis
+  sign: false
+  contents:
+    - x: 180
+      y: 170
+      type: file
+    - x: 460
+      y: 170
+      type: link
+      path: /Applications
+  window:
+    width: 640
+    height: 380

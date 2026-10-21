@@ -24,7 +24,7 @@ Opening the `.app` directly requires your local Ollama service to be running; th
 
 ## Fresh setup
 
-These instructions are for someone comfortable using Terminal. The repository is private, so access is required before downloading it. Obtain a copy of the project, then open Terminal in the `AIMeetingNotes` folder. Run the commands below from that folder. Installing prerequisites with `brew` requires Homebrew to be installed first.
+For the downloadable app with bundled dependencies, see the [installer guide](installer.md). The instructions below are for developers comfortable using Terminal. Clone the public repository, then open Terminal in the `AIMeetingNotes` folder. Run the commands below from that folder. Installing prerequisites with `brew` requires Homebrew to be installed first.
 
 
 Requirements: Node.js 22.12+ (24 recommended), Python 3.11–3.13, FFmpeg, and Ollama for local meeting intelligence. macOS 14.2+ is recommended for native system-audio capture; this project targets Apple Silicon by default.
@@ -41,7 +41,7 @@ npm run desktop
 
 In **Settings → Local setup**, set Python executable to the absolute `.venv/bin/python` path printed by the setup script. This path must point to the environment on the Mac being set up. Whisper downloads the selected weights on first transcription. Network access is needed for initial model downloads; local processing can then work offline.
 
-After confirming the app works, close the development app and run `npm run setup:signing` once and then `npm run package` to create the Mac application. Future launches can use **Launch NoteThis.command**. Keep the project folder and its local dependencies in place; the app bundle does not include Python, model downloads, or the Ollama service. Start the separately installed Ollama app before launching NoteThis unless a project-local runtime has been configured.
+After confirming the app works, close the development app and run `npm run setup:signing` once and then `npm run package` to create the Mac application. Future launches can use **Launch NoteThis.command**. Keep the project folder and its local dependencies in place; this development package does not include Python or the Ollama service. The separate `npm run installer` build bundles these runtimes. Model weights are downloaded separately in either case. Start the separately installed Ollama app before launching NoteThis unless a project-local runtime has been configured.
 
 Default models:
 

@@ -14,3 +14,6 @@ coverage/
 .local/
 dist-server/
 .test-data/
+
+# Redistributable runtime build outputs (sources/locks live under scripts/runtime)
+build/

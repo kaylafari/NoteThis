@@ -1,6 +1,6 @@
 {
   "name": "aim-meeting-notes",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Local-first meeting recorder with synchronized transcripts and meeting intelligence",
@@ -20,7 +20,9 @@
     "format": "prettier --write src server desktop shared tests \"scripts/*.mjs\" *.json *.ts",
     "test:local": "npm run build && node scripts/test-local.mjs",
     "test:browser-launch": "node scripts/test-browser-launch.mjs",
-    "setup:signing": "node scripts/local-signing.mjs --setup"
+    "setup:signing": "node scripts/local-signing.mjs --setup",
+    "prepare:runtime": "node scripts/prepare-runtime.mjs",
+    "installer": "node scripts/build-installer.mjs"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "latest",

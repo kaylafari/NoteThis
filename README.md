@@ -24,26 +24,26 @@ Your recordings and notes are saved on your Mac. Use AI on your computer or conn
 
 ## How to install
 
-### Installing for the first time
+### Download and install
 
-The current version is intended for **Apple Silicon Macs (M1 or newer)**. **macOS 14.2 or newer** is recommended for recording computer audio.
+For **Apple Silicon Macs (M1 or newer), running macOS 14.2 or later**:
 
-**There isn’t a one-click installer yet.** Downloading the project alone does not install it; the app and its AI tools need a one-time setup.
+1. Download **NoteThis-0.5.0-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
+2. Open the downloaded disk image and drag **NoteThis** into **Applications**.
+3. Open NoteThis from Applications. This community build is locally signed, **not Apple-notarized**. If macOS blocks it, use **System Settings → Privacy & Security → Open Anyway** for NoteThis, then confirm the system prompt.
+4. Follow the welcome guide. Choose **Prepare local AI** to download the default transcription and language models. Keep the app open and allow several minutes on a reliable internet connection. You can retry an interrupted download from Settings.
+5. If you have a ChatGPT subscription, the guide explains how to connect your own account for summaries and meeting questions. Transcription still runs locally unless you choose a separate speech service.
+6. When you start your first recording, approve **Microphone** and **Screen & System Audio Recording** access. NoteThis saves audio, not screen video.
 
-1. Get access to this project and download a copy to your Mac.
-2. Follow the [setup guide](docs/development.md#fresh-setup), or ask someone comfortable with Terminal to help install the required tools and prepare the application.
-3. Keep the project folder in place, then open NoteThis using the steps below.
+**No Terminal, Homebrew, Python installation, or separate Ollama installation is needed for this installer.** The app includes its software dependencies; AI model weights download when you choose Prepare local AI. Local models can run offline after that download. Keep NoteThis in Applications and launch it there on subsequent visits.
 
-Setup needs internet access. Once the local AI models are downloaded, local transcription and notes can work offline.
+The welcome explanations remain available in **Settings → Help & tips**, after **AI models** and **Local setup**. Those tabs also let you retry local setup or configure your own providers.
 
-### If NoteThis is already set up
+If Keychain asks, choose **Always Allow** to remember access. See [recording help](docs/recording.md) and [permission help](docs/permissions-persistence.md) if access remains blocked.
 
-1. Open the **AIMeetingNotes** project folder in Finder.
-2. Double-click **Launch NoteThis.command**. Open the file itself; don’t paste its name into Terminal. A Terminal window may open as the app starts.
-3. If you installed **Ollama** separately, open it first. A project-local copy starts automatically.
-4. On your first recording, allow **Microphone** and **Screen & System Audio Recording** access when requested. NoteThis saves audio, not screen video.
+### Building from source
 
-If access is blocked, follow the app’s permission message or visit **System Settings → Privacy & Security**, then reopen NoteThis. See [recording help](docs/recording.md). If Keychain keeps asking, choose **Always Allow** instead of **Allow**; see [remembering permissions](docs/permissions-persistence.md).
+Developers can follow the [setup guide](docs/development.md#fresh-setup). Existing source installations can continue opening **Launch NoteThis.command** from the project folder. The downloadable installer works independently of that folder.
 
 ## Try your first meeting
 

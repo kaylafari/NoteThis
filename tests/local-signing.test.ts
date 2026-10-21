@@ -505,3 +505,29 @@ describe("packaging signature hook", () => {
     expect(status().relocked).toBe(true);
   });
 });
+
+test("runtime signing includes native executables but seals non-code data only at bundle level", async () => {
+  const directory = await mkdtemp(
+    path.join(os.tmpdir(), "notethis-runtime-sign-"),
+  );
+  try {
+    const app = path.join(directory, "NoteThis.app");
+    const runtime = path.join(app, "Contents", "Resources", "runtime");
+    await mkdir(runtime, { recursive: true });
+    const native = path.join(runtime, "python");
+    const data = path.join(runtime, "model.bin");
+    await writeFile(native, Buffer.from("cffaedfe01000000", "hex"));
+    await writeFile(data, Buffer.from("0001020304050607", "hex"));
+    const { skipRuntimeData } = await import(
+      pathToFileURL(path.resolve("scripts/sign-local-mac.cjs")).href
+    );
+    expect(skipRuntimeData(native, app)).toBe(false);
+    expect(skipRuntimeData(data, app)).toBe(true);
+    expect(skipRuntimeData(runtime, app)).toBe(false);
+    expect(
+      skipRuntimeData(path.join(app, "Contents", "MacOS", "NoteThis"), app),
+    ).toBe(false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
