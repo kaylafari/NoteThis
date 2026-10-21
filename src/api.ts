@@ -27,7 +27,18 @@ export async function request<T>(
   if (response.status === 204) return undefined as T;
   return response.json();
 }
+export interface LocalSetupStatus {
+  state: "idle" | "running" | "ready" | "error";
+  stage: string;
+  message: string;
+}
 export const api = {
+  onboarding: () => request<{ completed: boolean }>("/onboarding"),
+  completeOnboarding: () =>
+    request<{ completed: boolean }>("/onboarding", { method: "POST" }),
+  localSetup: () => request<LocalSetupStatus>("/local-setup"),
+  prepareLocal: () =>
+    request<LocalSetupStatus>("/local-setup", { method: "POST" }),
   meetings: () => request<Meeting[]>("/meetings"),
   meeting: (id: string) => request<Meeting>(`/meetings/${id}`),
   upload: (file: File, title: string) => {

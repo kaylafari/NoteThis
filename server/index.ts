@@ -11,6 +11,15 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Meeting, Health } from "../shared/types.js";
 import { acquireDataLock } from "./lock.js";
+import {
+  createLocalSetup,
+  configureLocalRuntime,
+  resolvePythonPath,
+  resolveRuntimeBinary,
+  readOnboarding,
+  completeOnboarding,
+  type SetupDependencies,
+} from "./local-setup.js";
 import { Store, type SecretCodec } from "./storage.js";
 import { providerCatalog, transcribeAudio } from "./providers.js";
 import { discoverProviderModels } from "./model-discovery.js";
@@ -31,6 +40,8 @@ export type ServerOptions = {
   desktop?: boolean;
   staticDir?: string;
   secretCodec?: SecretCodec;
+  runtimeDir?: string;
+  localSetupDependencies?: Partial<SetupDependencies>;
 };
 const modelSchema = z.string().trim().min(1).max(200);
 const settingsSchema = z
@@ -81,6 +92,7 @@ export async function startServer(options: ServerOptions = {}) {
     options.dataDir ||
     process.env.CADENCE_DATA_DIR ||
     path.join(os.homedir(), "Library", "Application Support", "Cadence");
+  if (options.runtimeDir) configureLocalRuntime(options.runtimeDir, dataDir);
   const releaseLock = await acquireDataLock(dataDir);
   const store = new Store(dataDir, options.secretCodec);
   try {
@@ -89,6 +101,14 @@ export async function startServer(options: ServerOptions = {}) {
     releaseLock();
     throw error;
   }
+  const localSetup = createLocalSetup({
+    dataDir,
+    runtimeDir: options.runtimeDir,
+    pythonPath: async () => (await store.getSettings()).local.pythonPath,
+    dependencies: options.localSetupDependencies,
+  });
+  // Start only the installed service here. Model downloads require explicit POST.
+  if (options.runtimeDir) void localSetup.startService().catch(() => {});
   configureOAuthStorage({
     read: async () => JSON.parse((await store.getSecret("oauth")) || "{}"),
     write: async (value: unknown) => {
@@ -247,6 +267,24 @@ export async function startServer(options: ServerOptions = {}) {
     });
     return meeting;
   }
+  app.get("/api/onboarding", async (_req, res) =>
+    res.json(await readOnboarding(dataDir)),
+  );
+  app.post("/api/onboarding", async (req, res) => {
+    z.object({ completed: z.literal(true).optional() })
+      .strict()
+      .parse(req.body ?? {});
+    res.json(await completeOnboarding(dataDir));
+  });
+  app.get("/api/local-setup", async (_req, res) =>
+    res.json(await localSetup.status()),
+  );
+  app.post("/api/local-setup", async (req, res) => {
+    z.object({})
+      .strict()
+      .parse(req.body ?? {});
+    res.json(await localSetup.start());
+  });
   app.get("/api/providers", (_req, res) => res.json(providerCatalog()));
   app.post("/api/providers/:provider/models", async (req, res) => {
     const input = z
@@ -329,9 +367,12 @@ export async function startServer(options: ServerOptions = {}) {
       }
     } catch {}
     const [ffmpeg, python, whisper] = await Promise.all([
-      commandWorks("ffmpeg", ["-version"]),
-      commandWorks(settings.local.pythonPath, ["--version"]),
-      commandWorks(settings.local.pythonPath, ["-c", "import faster_whisper"]),
+      commandWorks(resolveRuntimeBinary("ffmpeg"), ["-version"]),
+      commandWorks(resolvePythonPath(settings.local.pythonPath), ["--version"]),
+      commandWorks(resolvePythonPath(settings.local.pythonPath), [
+        "-c",
+        "import faster_whisper",
+      ]),
     ]);
     res.json({
       ok: true,
@@ -379,7 +420,7 @@ export async function startServer(options: ServerOptions = {}) {
       let duration = 0;
       try {
         const { stdout } = await exec(
-          "ffprobe",
+          resolveRuntimeBinary("ffprobe"),
           [
             "-v",
             "error",
@@ -627,9 +668,16 @@ export async function startServer(options: ServerOptions = {}) {
       const instance = app.listen(
         options.port ?? Number(process.env.PORT || 4318),
         "127.0.0.1",
-        () => resolve(instance),
+        (error?: Error) => {
+          if (error) {
+            void localSetup.close();
+            releaseLock();
+            reject(error);
+          } else resolve(instance);
+        },
       );
       instance.on("error", (error) => {
+        void localSetup.close();
         releaseLock();
         reject(error);
       });
@@ -637,14 +685,17 @@ export async function startServer(options: ServerOptions = {}) {
   );
   return {
     port: (server.address() as import("node:net").AddressInfo).port,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
+    close: async () => {
+      await localSetup.close();
+      await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           releaseLock();
           if (error) reject(error);
           else resolve();
-        }),
-      ),
+        });
+        server.closeIdleConnections();
+      });
+    },
   };
 }
 if (

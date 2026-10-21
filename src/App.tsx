@@ -58,6 +58,7 @@ import type {
   Segment,
 } from "../shared/types";
 import { api } from "./api";
+import { HelpContent, LocalPreparation } from "./Help";
 import { LatexSummary } from "./LatexSummary";
 import { exportLatexMeeting } from "../shared/latex";
 import { openExternalLink } from "./external-links";
@@ -176,6 +177,94 @@ function Modal({
         {children}
       </div>
     </div>
+  );
+}
+
+export function OnboardingWelcome({
+  suspended = false,
+  onLocalReady,
+  onOpenModels,
+}: {
+  suspended?: boolean;
+  onLocalReady?: () => void | Promise<void>;
+  onOpenModels?: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const completing = useRef(false);
+  useEffect(() => {
+    let canceled = false;
+    api
+      .onboarding()
+      .then((value) => {
+        if (!canceled && value?.completed === false) setVisible(true);
+      })
+      .catch(() => {});
+    return () => {
+      canceled = true;
+    };
+  }, []);
+  async function finish() {
+    if (completing.current) return false;
+    completing.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.completeOnboarding();
+      if (result?.completed !== true)
+        throw new Error(
+          "Couldn’t save your welcome preference. Please try again.",
+        );
+      setVisible(false);
+      return true;
+    } catch (cause) {
+      setError((cause as Error).message);
+      return false;
+    } finally {
+      completing.current = false;
+      setBusy(false);
+    }
+  }
+  if (!visible || suspended) return null;
+  return (
+    <Modal
+      title="Welcome to NoteThis"
+      subtitle="A little help for your first conversation."
+      onClose={() => void finish()}
+      wide
+    >
+      <div className="welcome-body">
+        <HelpContent
+          onLocalReady={onLocalReady}
+          onOpenModels={
+            onOpenModels
+              ? async () => {
+                  if (await finish()) onOpenModels();
+                }
+              : undefined
+          }
+        />
+      </div>
+      <footer className="welcome-footer">
+        <div>
+          {error && (
+            <p className="field-error" role="alert">
+              {error}
+            </p>
+          )}
+          <span>Find this guide later in Settings → Help & tips.</span>
+        </div>
+        <button
+          className="button primary"
+          type="button"
+          disabled={busy}
+          onClick={() => void finish()}
+        >
+          {busy ? <Spinner /> : <Check size={15} />}Get started
+        </button>
+      </footer>
+    </Modal>
   );
 }
 
@@ -1358,6 +1447,11 @@ export default function App() {
           <p>MP3, WAV, M4A, FLAC, OGG, or WebM</p>
         </div>
       )}
+      <OnboardingWelcome
+        suspended={showSettings || showRecord || showDelete}
+        onLocalReady={refreshSetup}
+        onOpenModels={() => setShowSettings(true)}
+      />
       {showSettings && settings && catalog && (
         <SettingsModal
           settings={settings}
@@ -2577,7 +2671,7 @@ export function SettingsModal({
 }) {
   const [draft, setDraft] = useState(settings);
   const [keys, setKeys] = useState<Record<string, string>>({});
-  const [section, setSection] = useState<"models" | "setup">("models");
+  const [section, setSection] = useState<"models" | "setup" | "help">("models");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -3024,6 +3118,13 @@ export function SettingsModal({
           <Settings2 size={16} />
           Local setup
         </button>
+        <button
+          className={section === "help" ? "active" : ""}
+          onClick={() => setSection("help")}
+        >
+          <HelpCircle size={16} />
+          Help & tips
+        </button>
       </div>
       <form onSubmit={save} onChange={() => setSaved(false)}>
         <fieldset
@@ -3417,6 +3518,11 @@ export function SettingsModal({
                 </span>
               </div>
             </>
+          ) : section === "help" ? (
+            <HelpContent
+              onLocalReady={onRefresh}
+              onOpenModels={() => setSection("models")}
+            />
           ) : (
             <>
               <div className="settings-section">
@@ -3480,33 +3586,7 @@ export function SettingsModal({
                     </div>
                   ))}
                 </div>
-                <div className="setup-instructions">
-                  <h4>First-time setup</h4>
-                  <p>
-                    From the project folder, run the local speech setup script.
-                    Install Ollama, then download a language model.
-                  </p>
-                  <code>npm run setup:local</code>
-                  <code>ollama pull qwen3:0.6b</code>
-                  <p>
-                    The first speech transcription downloads the selected
-                    Whisper model. Models need disk space and can take a few
-                    minutes to load.
-                  </p>
-                  <a
-                    href="https://ollama.com/download"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void openExternalLink(
-                        "https://ollama.com/download",
-                      ).catch((error) => setError((error as Error).message));
-                    }}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Get Ollama <ExternalLink size={12} />
-                  </a>
-                </div>
+                <LocalPreparation onReady={onRefresh} />
               </div>
               <div className="settings-section">
                 <label className="field">
@@ -3557,33 +3637,35 @@ export function SettingsModal({
             </p>
           )}
         </fieldset>
-        <footer className="settings-footer">
-          <span>
-            {saved ? (
-              <>
-                <Check size={14} />
-                Preferences saved
-              </>
-            ) : (
-              <>
-                <ShieldCheck size={14} />
-                Your choices stay on this device
-              </>
-            )}
-          </span>
-          <button
-            className="button primary"
-            type="submit"
-            disabled={
-              busy ||
-              !!authBusy ||
-              speechModels.loading ||
-              languageModels.loading
-            }
-          >
-            {busy ? <Spinner /> : <Check size={15} />}Save preferences
-          </button>
-        </footer>
+        {section !== "help" && (
+          <footer className="settings-footer">
+            <span>
+              {saved ? (
+                <>
+                  <Check size={14} />
+                  Preferences saved
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={14} />
+                  Your choices stay on this device
+                </>
+              )}
+            </span>
+            <button
+              className="button primary"
+              type="submit"
+              disabled={
+                busy ||
+                !!authBusy ||
+                speechModels.loading ||
+                languageModels.loading
+              }
+            >
+              {busy ? <Spinner /> : <Check size={15} />}Save preferences
+            </button>
+          </footer>
+        )}
       </form>
     </Modal>
   );

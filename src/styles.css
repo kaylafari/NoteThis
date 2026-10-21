@@ -3961,3 +3961,136 @@ textarea::placeholder {
   max-height: 320px;
   overflow-y: auto;
 }
+
+.welcome-body {
+  padding: 26px 30px;
+  max-height: 66vh;
+  overflow-y: auto;
+}
+.welcome-footer {
+  padding: 18px 30px;
+  border-top: 1px solid #e3e3e6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.welcome-footer > div {
+  font-size: 11px;
+  color: #606065;
+  line-height: 1.7;
+}
+.welcome-footer .button {
+  flex-shrink: 0;
+}
+.help-content {
+  font-size: 12px;
+  color: #454549;
+  line-height: 1.85;
+}
+.help-content .help-intro {
+  font-size: 17px;
+  font-weight: 500;
+  color: #353539;
+  margin: 0 0 24px;
+  letter-spacing: -0.02em;
+}
+.help-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 26px;
+}
+.help-steps section {
+  border-top: 1px solid #e3e3e6;
+  padding-top: 14px;
+}
+.help-step-number {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #7b6044;
+}
+.help-content h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #353539;
+  margin: 6px 0 9px;
+}
+.help-content p {
+  margin: 0 0 10px;
+}
+.help-note {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e3e3e6;
+}
+.help-content .help-footnote {
+  color: #606065;
+  font-size: 11px;
+  margin-top: 18px;
+}
+.local-preparation {
+  border: 1px solid #e4d9cd;
+  border-radius: 9px;
+  background: #faf7f3;
+  padding: 18px;
+  margin-top: 22px;
+}
+.local-preparation h4 {
+  font-size: 13px;
+  color: #454549;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.local-preparation p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #606065;
+  margin: 0 0 13px;
+}
+.local-preparation .local-preparation-status {
+  margin: 12px 0 0;
+  color: #665440;
+}
+.local-preparation .local-preparation-hint {
+  margin-top: 8px;
+}
+.local-preparation .field-error {
+  margin-top: 12px;
+}
+@media (max-width: 620px) {
+  .help-steps {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .welcome-body {
+    padding: 20px;
+  }
+  .welcome-footer {
+    padding: 16px 20px;
+    align-items: flex-start;
+  }
+  .settings-tabs {
+    flex-wrap: wrap;
+  }
+}
+.help-account {
+  margin-bottom: 25px;
+  padding: 18px;
+  border-radius: 9px;
+  background: #f5f2ee;
+  border: 1px solid #e4d9cd;
+}
+.help-account > h3 {
+  margin-top: 0;
+}
+.help-account ol {
+  padding-left: 20px;
+  margin: 12px 0;
+}
+.help-account li {
+  margin: 8px 0;
+  padding-left: 2px;
+}
+.help-account .button {
+  margin-top: 4px;
+}

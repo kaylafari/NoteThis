@@ -13,7 +13,13 @@ import {
 import path from "node:path";
 import { preserveDesktopIdentity, showProductName } from "./identity";
 import { createSecretCodec } from "./secret-codec";
-import { appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  statSync,
+  renameSync,
+  existsSync,
+} from "node:fs";
 import { launchExternal, registerExternalLinks } from "./external-links";
 import { pathToFileURL } from "node:url";
 import {
@@ -319,6 +325,11 @@ else {
         dataDir: app.getPath("userData"),
         staticDir: path.join(app.getAppPath(), "dist"),
         desktop: true,
+        runtimeDir:
+          app.isPackaged &&
+          existsSync(path.join(process.resourcesPath, "runtime"))
+            ? path.join(process.resourcesPath, "runtime")
+            : undefined,
         secretCodec,
       });
       origin = `http://127.0.0.1:${server!.port}`;

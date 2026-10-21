@@ -64,7 +64,17 @@ async function request(route: string, options?: RequestInit) {
 }
 beforeAll(async () => {
   dataDir = await mkdtemp(path.join(os.tmpdir(), "cadence-api-"));
-  server = await startServer({ port: 0, dataDir });
+  server = await startServer({
+    port: 0,
+    dataDir,
+    localSetupDependencies: {
+      run: async () => {},
+      fetch: async () => Response.json({ models: [{ name: "qwen3:0.6b" }] }),
+      spawnService: () => {
+        throw new Error("API fixture must not launch services");
+      },
+    },
+  });
   base = `http://127.0.0.1:${server.port}/api`;
   const audio = Buffer.alloc(32044);
   audio.write("RIFF");
@@ -99,6 +109,46 @@ afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 describe("local API workflow", () => {
+  it("persists onboarding and exposes explicit local preparation", async () => {
+    expect(await (await request("/onboarding")).json()).toEqual({
+      completed: false,
+    });
+    expect((await request("/onboarding", { method: "POST" })).status).toBe(403);
+    expect(
+      await (
+        await request("/onboarding", { method: "POST", headers, body: "{}" })
+      ).json(),
+    ).toEqual({ completed: true });
+    expect(await (await request("/onboarding")).json()).toEqual({
+      completed: true,
+    });
+    expect(await (await request("/local-setup")).json()).toMatchObject({
+      state: "idle",
+    });
+    expect((await request("/local-setup", { method: "POST" })).status).toBe(
+      403,
+    );
+    expect(
+      (
+        await request("/local-setup", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ url: "https://untrusted.example" }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      await (
+        await request("/local-setup", { method: "POST", headers, body: "{}" })
+      ).json(),
+    ).toMatchObject({ state: "running" });
+    await vi.waitFor(async () =>
+      expect(await (await request("/local-setup")).json()).toMatchObject({
+        state: "ready",
+      }),
+    );
+  });
+
   it("blocks cross-origin and headerless mutations", async () => {
     expect(
       (

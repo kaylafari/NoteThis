@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { resolvePythonPath, resolveRuntimeBinary } from "./local-setup.js";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -236,7 +237,9 @@ function runProcess(
       clearTimeout(timer);
       reject(
         new Error(
-          `Cannot start ${path.basename(command)}. Install the local dependencies and check Settings.`,
+          process.env.CADENCE_RUNTIME_DIR
+            ? "The bundled local runtime could not start. Prepare local AI in Settings, or reinstall the complete NoteThis app."
+            : `Cannot start ${path.basename(command)}. Install the local dependencies and check Settings.`,
         ),
       );
     });
@@ -257,9 +260,11 @@ function runProcess(
       else if (code !== 0)
         reject(
           new Error(
-            errorTail.includes("Install local transcription:")
-              ? "Local Whisper is not installed. Run the local setup command and select its Python executable in Settings."
-              : `${path.basename(command)} could not process the recording. Check the audio format, local dependencies, model download connectivity, and free disk space.`,
+            process.env.CADENCE_RUNTIME_DIR
+              ? "Local audio processing failed. Prepare local AI in Settings and check the audio format and available disk space."
+              : errorTail.includes("Install local transcription:")
+                ? "Local Whisper is not installed. Run the local setup command and select its Python executable in Settings."
+                : `${path.basename(command)} could not process the recording. Check the audio format, local dependencies, model download connectivity, and free disk space.`,
           ),
         );
       else resolve(stdout);
@@ -268,7 +273,7 @@ function runProcess(
 }
 export async function probeAudioDuration(filePath: string): Promise<number> {
   const result = await runProcess(
-    "ffprobe",
+    resolveRuntimeBinary("ffprobe"),
     [
       "-protocol_whitelist",
       "file,pipe",
@@ -289,7 +294,7 @@ export async function probeAudioDuration(filePath: string): Promise<number> {
     // MediaRecorder WebM often lacks a duration header. Decode audio to a null sink
     // and use ffmpeg's final media clock, without writing a large temporary file.
     const decoded = await runProcess(
-      "ffmpeg",
+      resolveRuntimeBinary("ffmpeg"),
       [
         "-nostdin",
         "-protocol_whitelist",
@@ -682,7 +687,7 @@ export async function transcribeAudio(
       "Recordings may be up to eight hours long. Split this recording before uploading.",
     );
   if (settings.stt.provider === "local") {
-    const python = settings.local.pythonPath || "python3";
+    const python = resolvePythonPath(settings.local.pythonPath);
     const script = process.env.CADENCE_RESOURCE_DIR
       ? path.join(process.env.CADENCE_RESOURCE_DIR, "scripts/transcribe.py")
       : fileURLToPath(new URL("../scripts/transcribe.py", import.meta.url));
@@ -723,7 +728,7 @@ export async function transcribeAudio(
       const chunk = path.join(work, "chunk.wav");
       onProgress?.(`Preparing audio ${index + 1} of ${count}…`);
       await runProcess(
-        "ffmpeg",
+        resolveRuntimeBinary("ffmpeg"),
         [
           "-nostdin",
           "-protocol_whitelist",
