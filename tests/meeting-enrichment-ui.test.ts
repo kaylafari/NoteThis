@@ -207,6 +207,18 @@ test("web sources stay separate from transcript citations and only safe meeting 
       };
       w.renderEnrichment(props);
       await check(
+        () => document.querySelectorAll(".meeting-visual img").length === 2,
+        "Only the two validated image sources are rendered",
+      );
+      // This fixture uses a hidden window. Chromium need not load lazy images
+      // there; request loading explicitly so this tests decoding/source safety,
+      // independently of the runner's visibility and viewport scheduling.
+      document
+        .querySelectorAll<HTMLImageElement>(".meeting-visual img")
+        .forEach((image) => {
+          image.loading = "eager";
+        });
+      await check(
         () =>
           document.querySelectorAll(".meeting-visual img").length === 2 &&
           Array.from(

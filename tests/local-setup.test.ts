@@ -238,6 +238,58 @@ describe("local preparation", () => {
     await manager.start();
     expect((await finished(manager)).state).toBe("ready");
   });
+  it("honors simultaneous retries while the failed attempt flushes its final write", async () => {
+    const save = storage.atomicJson;
+    let release!: () => void;
+    let writingError!: () => void;
+    const errorWrite = new Promise<void>((resolve) => {
+      writingError = resolve;
+    });
+    const holdWrite = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.spyOn(storage, "atomicJson").mockImplementation(
+      async (filename, value) => {
+        if ((value as { state?: string }).state === "error") {
+          writingError();
+          await holdWrite;
+        }
+        return save(filename, value);
+      },
+    );
+    const f = fixture();
+    f.dependencies.run.mockRejectedValueOnce(
+      new Error("Synthetic first failure"),
+    );
+    const manager = f.make();
+    await manager.start();
+    await errorWrite;
+    let retriesSettled = false;
+    const retry = Promise.all([manager.start(), manager.start()]).then(
+      (value) => {
+        retriesSettled = true;
+        return value;
+      },
+    );
+    try {
+      await Promise.resolve();
+      await Promise.resolve();
+      expect((await manager.status()).state).toBe("error");
+      expect(retriesSettled).toBe(false);
+      expect(f.dependencies.run).toHaveBeenCalledTimes(1);
+    } finally {
+      release();
+    }
+    expect((await retry).every((value) => value.state === "running")).toBe(
+      true,
+    );
+    expect((await finished(manager)).state).toBe("ready");
+    expect(
+      f.dependencies.run.mock.calls.filter((call) =>
+        call[1][1]?.includes("local_files_only=False"),
+      ),
+    ).toHaveLength(1);
+  });
   it("spawns only its own loopback service and stops only that child", async () => {
     const f = fixture(true);
     f.setHealthy(false);

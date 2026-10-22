@@ -529,6 +529,9 @@ export function createLocalSetup(options: LocalSetupOptions) {
     },
     async start() {
       await initialize();
+      // A terminal status is visible before its final disk write finishes.
+      // Honor Retry during that write instead of silently returning the old error.
+      if (active && current.state !== "running") await active;
       if (closed) return { ...interrupted };
       if (active || current.state === "running") return { ...current };
       // Always verify again on an explicit request; a previous marker is not proof.
