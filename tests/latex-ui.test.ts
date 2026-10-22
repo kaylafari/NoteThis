@@ -20,7 +20,12 @@ test("LaTeX notes render formulas, structures and accessible bounded charts with
       platform: "browser",
       format: "iife",
       outfile: path.join(scratch, "app.js"),
-      loader: { ".woff2": "file", ".woff": "file", ".ttf": "file" },
+      loader: {
+        ".woff2": "file",
+        ".woff": "file",
+        ".ttf": "file",
+        ".png": "file",
+      },
       assetNames: "fonts/[name]-[hash]",
     });
     await writeFile(

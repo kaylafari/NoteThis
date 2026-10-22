@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import electron from "electron";
 
-// Rebuild the original SVG icon using the same Chromium renderer as the app.
+// Rebuild the approved artwork with a macOS rounded-square mask using the same Chromium renderer as the app.
 // macOS's iconutil packages the standard 16–1024px PNG representations.
 if (process.platform !== "darwin")
   throw new Error("Building the .icns icon requires macOS iconutil and sips.");
@@ -25,9 +25,13 @@ function run(command, args, env = process.env) {
 try {
   const output = path.join(root, "assets/notethis-icon.png");
   const renderer = path.join(work, "render.cjs");
-  const svg = await readFile(
-    path.join(root, "assets/notethis-icon.svg"),
-    "utf8",
+  let svg = await readFile(path.join(root, "assets/notethis-icon.svg"), "utf8");
+  const artwork = await readFile(
+    path.join(root, "assets/notethis-artwork.png"),
+  );
+  svg = svg.replace(
+    'href="notethis-artwork.png"',
+    `href="data:image/png;base64,${artwork.toString("base64")}"`,
   );
   await writeFile(
     renderer,
@@ -47,6 +51,14 @@ app.whenReady().then(async()=>{
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   run(electron, [renderer], env);
+  run("/usr/bin/sips", [
+    "-z",
+    "64",
+    "64",
+    output,
+    "--out",
+    path.join(root, "public/favicon.png"),
+  ]);
   const iconset = path.join(work, "notethis.iconset");
   const { mkdir } = await import("node:fs/promises");
   await mkdir(iconset);
@@ -71,7 +83,7 @@ app.whenReady().then(async()=>{
     path.join(root, "assets/notethis.icns"),
   ]);
   console.log(
-    "Built assets/notethis-icon.png and assets/notethis.icns from the original SVG.",
+    "Built assets/notethis-icon.png and assets/notethis.icns and public/favicon.png from the approved artwork.",
   );
 } finally {
   await rm(work, { recursive: true, force: true });

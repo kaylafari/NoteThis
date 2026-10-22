@@ -9,7 +9,8 @@
   font-size: 14px;
   --ink: #262626;
   --muted: #707074;
-  --accent: #806d57;
+  --accent: #6f2da8;
+  --accent-hover: #592287;
   --pale: #f2eee8;
   --line: #e3e3e6;
   --sidebar: #f5f5f7;
@@ -142,12 +143,20 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0ece6;
-  color: #76614b;
+  background: transparent;
+  color: #707074;
   width: 36px;
   height: 36px;
   border-radius: 11px;
   transform: none;
+}
+.brand-nib {
+  display: block;
+  width: 32px;
+  height: 32px;
+  background: #707074;
+  mask: url("../assets/notethis-mark.png") center / contain no-repeat;
+  -webkit-mask: url("../assets/notethis-mark.png") center / contain no-repeat;
 }
 .brand-dot {
   color: #8e7a64;
@@ -436,13 +445,13 @@ textarea::placeholder {
   white-space: nowrap;
 }
 .button.primary {
-  background: #303033;
+  background: var(--accent);
   color: #ffffff;
-  border: 1px solid #303033;
+  border: 1px solid var(--accent);
   box-shadow: 0 2px 3px #00000012;
 }
 .button.primary:hover:not(:disabled) {
-  background: #171719;
+  background: var(--accent-hover);
 }
 .button.secondary {
   background: #ffffff;
@@ -604,7 +613,7 @@ textarea::placeholder {
   padding: 0 1px;
 }
 .tabs > button.active {
-  color: #454549;
+  color: var(--accent);
   font-weight: 600;
 }
 .tabs > button.active:after {
@@ -613,7 +622,7 @@ textarea::placeholder {
   bottom: -1px;
   left: 0;
   right: 0;
-  background: #303033;
+  background: var(--accent);
   height: 2px;
 }
 .tab-count {
@@ -1192,7 +1201,7 @@ textarea::placeholder {
   border-radius: 3px;
   background: linear-gradient(
     to right,
-    #8d765b var(--progress),
+    var(--accent) var(--progress),
     #dedbd7 var(--progress)
   );
   cursor: pointer;
@@ -1204,7 +1213,7 @@ textarea::placeholder {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #8d765b;
+  background: var(--accent);
   box-shadow: 0 0 0 3px #fafafa;
 }
 .timeline input::-moz-range-thumb {
@@ -1212,7 +1221,7 @@ textarea::placeholder {
   height: 9px;
   border: 0;
   border-radius: 50%;
-  background: #8d765b;
+  background: var(--accent);
 }
 .speed-control {
   display: flex;
@@ -2129,7 +2138,7 @@ textarea::placeholder {
   padding: 0;
 }
 .settings-tabs > button.active {
-  color: #606065;
+  color: var(--accent);
 }
 .settings-tabs > button.active:after {
   content: "";
@@ -2138,7 +2147,7 @@ textarea::placeholder {
   height: 2px;
   left: 0;
   right: 0;
-  background: #b5b5ba;
+  background: var(--accent);
 }
 .settings-body {
   max-height: calc(100dvh - 304px);

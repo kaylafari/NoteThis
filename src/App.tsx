@@ -531,7 +531,7 @@ export default function App() {
           aria-label="NoteThis home"
         >
           <span className="brand-icon">
-            <img src="/notethis-mark.svg" alt="" width={32} height={32} />
+            <span className="brand-nib" aria-hidden="true" />
           </span>
           <span>NoteThis</span>
         </a>

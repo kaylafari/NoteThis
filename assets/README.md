@@ -6,4 +6,8 @@
 
 ## NoteThis identity
 
-The original SVG artwork depicts a closed calligraphy pen cap with a clip and narrow band. `notethis-mark.svg` is the transparent interface mark; `notethis-icon.svg`, its PNG, and `.icns` are the macOS app icon. Rebuild generated icons on macOS with `node scripts/build-icons.mjs`. The public SVG copies serve the app header and favicon.
+`notethis-artwork.png` is the approved white fountain-pen nib on a purple gradient. `notethis-icon.svg` wraps that artwork in a macOS rounded-square mask; `notethis-icon.png` and `notethis.icns` are generated application icons.
+
+`notethis-mark.png` is the transparent nib used beside the app name. The interface uses its alpha channel as a CSS mask with a uniform gray fill, so the mark stays flat and has no background. Vite bundles the mark with the interface.
+
+Rebuild the app icons and `public/favicon.png` on macOS with `node scripts/build-icons.mjs`. Keep the approved artwork and transparent mark as source assets. The interface accent is `#6F2DA8`, used sparingly for primary buttons, selected tabs, and playback progress.
