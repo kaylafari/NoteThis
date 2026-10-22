@@ -28,7 +28,7 @@ Your recordings and notes are saved on your Mac. Use AI on your computer or conn
 
 For **Apple Silicon Macs (M1 or newer), running macOS 14.2 or later**:
 
-1. Download **NoteThis-0.5.1-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
+1. Download **NoteThis-0.5.2-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
 2. Open the downloaded disk image and drag **NoteThis** into **Applications**.
 3. Open NoteThis from Applications. This community build is locally signed, **not Apple-notarized**. If macOS blocks it, use **System Settings → Privacy & Security → Open Anyway** for NoteThis, then confirm the system prompt.
 4. Follow the welcome guide. Choose **Prepare local AI** to download the default transcription and language models. Keep the app open and allow several minutes on a reliable internet connection. You can retry an interrupted download from Settings.
