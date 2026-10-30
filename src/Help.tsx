@@ -221,6 +221,60 @@ export function HelpContent({
           </button>
         )}
       </section>
+      <section className="help-account">
+        <h3>Connect Claude with your own API key</h3>
+        <p>
+          Use Claude for meeting summaries and questions through an Anthropic
+          API key. API usage is billed separately from your Claude subscription;
+          a Claude Pro or Max subscription does not include API credits.
+        </p>
+        <ol>
+          <li>
+            Sign in to <strong>Claude Console</strong> at{" "}
+            <a
+              href="https://platform.claude.com/settings/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              platform.claude.com/settings/keys
+            </a>
+            . Set up API billing if needed, then create and copy an API key.
+            Keep this key private.
+          </li>
+          <li>
+            In NoteThis, open{" "}
+            <strong>Settings → AI models → Meeting intelligence</strong>. Under{" "}
+            <strong>Provider</strong>, choose the <strong>Anthropic</strong>{" "}
+            option. It may be labeled{" "}
+            <strong>Anthropic (Claude Pro/Max)</strong>; for this setup, use an
+            API key rather than the browser sign-in option.
+          </li>
+          <li>
+            Scroll to <strong>Provider API keys</strong>, paste your key into
+            the Anthropic field, and click <strong>Save key</strong>. Wait for{" "}
+            <strong>Key configured</strong> to appear.
+          </li>
+          <li>
+            Return to the model list, click <strong>Refresh models</strong>,
+            choose an available Claude model, then click{" "}
+            <strong>Save preferences</strong>.
+          </li>
+        </ol>
+        <p>
+          Claude receives transcript text to produce your notes and answers.
+          Speech transcription is configured separately. You can return to
+          Provider API keys to replace or remove your saved key.
+        </p>
+        {onOpenModels && (
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => void onOpenModels()}
+          >
+            Open AI models
+          </button>
+        )}
+      </section>
       <div className="help-steps">
         <section>
           <span className="help-step-number">01</span>
