@@ -8,9 +8,9 @@ Help remains available in Settings after AI models and Local setup. The default 
 
 ## Updating
 
-From 0.5.5, Settings → Updates checks the latest stable public GitHub release. Checks also run 15 seconds after startup and every six hours; downloads require a click. The native Electron/Squirrel updater validates the signed ZIP against the running app, replaces the app and relaunches it on Restart to update (or applies a downloaded update on the next app launch). Recording, unsaved settings, active uploads, processing and local model setup block an update restart. Main-process IPC accepts requests only from the app's main frame.
+From 0.5.6, Settings → Updates checks the latest stable public GitHub release. Checks also run 15 seconds after startup and every six hours; downloads require a click. The native Electron/Squirrel updater validates the signed ZIP against the running app, replaces the app and relaunches it on Restart to update (or applies a downloaded update on the next app launch). Recording, unsaved settings, active uploads, processing and local model setup block an update restart. Main-process IPC accepts requests only from the app's main frame.
 
-Users on 0.5.4 or older install 0.5.5 manually once. Manual fallback: quit NoteThis after saving any recording, download the latest DMG, drag NoteThis to Applications, and choose Replace. Launch the replacement from Applications, then eject the DMG. The bundle identifier, signing identity, legacy Keychain name, and application-data location remain stable across releases. Replacing the app does not delete recordings, preferences, provider credentials, or downloaded models. Do not remove the application-data folder or use an app-cleaner tool.
+Users on 0.5.4 or older install 0.5.6 manually once. Manual fallback: quit NoteThis after saving any recording, download the latest DMG, drag NoteThis to Applications, and choose Replace. Launch the replacement from Applications, then eject the DMG. The bundle identifier, signing identity, legacy Keychain name, and application-data location remain stable across releases. Replacing the app does not delete recordings, preferences, provider credentials, or downloaded models. Do not remove the application-data folder or use an app-cleaner tool.
 
 See the [plain-language update steps](../README.md#updating-an-existing-installation).
 

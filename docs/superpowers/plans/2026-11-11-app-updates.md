@@ -31,3 +31,5 @@
 - Implementation stays in the user's clean current checkout and authorized main branch; no parallel implementers or unrelated modifications.
 
 - Final pre-package verification: 443 tests in 32 files, TypeScript and production build passed. Feature commit f46f559 pushed.
+
+- Final banner regression reproduced a hidden download error and verified the fix. All 443 tests and build pass again. The unpublished 0.5.5 candidate is superseded by 0.5.6; no published tag is moved.

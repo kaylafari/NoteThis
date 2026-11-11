@@ -28,7 +28,7 @@ Your recordings and notes are saved on your Mac. Use AI on your computer or conn
 
 For **Apple Silicon Macs (M1 or newer), running macOS 14.2 or later**:
 
-1. Download **NoteThis-0.5.5-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
+1. Download **NoteThis-0.5.6-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
 2. Open the downloaded disk image and drag **NoteThis** into **Applications**.
 3. Open NoteThis from Applications. This community build is locally signed, **not Apple-notarized**. If macOS blocks it, use **System Settings → Privacy & Security → Open Anyway** for NoteThis, then confirm the system prompt.
 4. Follow the welcome guide. Choose **Prepare local AI** to download the default transcription and language models. Keep the app open and allow several minutes on a reliable internet connection. You can retry an interrupted download from Settings.
@@ -43,7 +43,7 @@ If Keychain asks, choose **Always Allow** to remember access. See [recording hel
 
 ### Updating an existing installation
 
-**Version 0.5.5 and newer:** open **Settings → Updates**, choose **Check for updates**, then **Download update**. When it is ready, choose **Restart to update**. NoteThis also checks when it opens and every six hours. Downloads start only when you choose them; a downloaded update installs on restart or the next launch. Finish recording, processing, and saving changes before restarting.
+**Version 0.5.6 and newer:** open **Settings → Updates**, choose **Check for updates**, then **Download update**. When it is ready, choose **Restart to update**. NoteThis also checks when it opens and every six hours. Downloads start only when you choose them; a downloaded update installs on restart or the next launch. Finish recording, processing, and saving changes before restarting.
 
 **Version 0.5.4 and older need one final manual update** to get the updater. Use these steps, or use them as a fallback if automatic installation fails:
 
