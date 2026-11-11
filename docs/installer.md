@@ -6,6 +6,12 @@ The first launch opens a guide. **Prepare local AI** downloads Whisper base and 
 
 Help remains available in Settings after AI models and Local setup. The default local runtime is managed by NoteThis; an already-running Ollama service is reused and is never shut down by NoteThis. Explicit custom Python and server settings remain supported.
 
+## Updating
+
+Updates are manual: quit NoteThis after saving any recording, download the latest DMG, drag NoteThis to Applications, and choose Replace. Launch the replacement from Applications, then eject the DMG. The bundle identifier, signing identity, legacy Keychain name, and application-data location remain stable across releases. Replacing the app does not delete recordings, preferences, provider credentials, or downloaded models. Do not remove the application-data folder or use an app-cleaner tool.
+
+See the [plain-language update steps](../README.md#updating-an-existing-installation).
+
 ## Build
 
 On an Apple Silicon Mac:

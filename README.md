@@ -28,7 +28,7 @@ Your recordings and notes are saved on your Mac. Use AI on your computer or conn
 
 For **Apple Silicon Macs (M1 or newer), running macOS 14.2 or later**:
 
-1. Download **NoteThis-0.5.3-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
+1. Download **NoteThis-0.5.4-mac-arm64.dmg** from [GitHub Releases](https://github.com/kaylafari/NoteThis/releases).
 2. Open the downloaded disk image and drag **NoteThis** into **Applications**.
 3. Open NoteThis from Applications. This community build is locally signed, **not Apple-notarized**. If macOS blocks it, use **System Settings → Privacy & Security → Open Anyway** for NoteThis, then confirm the system prompt.
 4. Follow the welcome guide. Choose **Prepare local AI** to download the default transcription and language models. Keep the app open and allow several minutes on a reliable internet connection. You can retry an interrupted download from Settings.
@@ -40,6 +40,19 @@ For **Apple Silicon Macs (M1 or newer), running macOS 14.2 or later**:
 The welcome explanations remain available in **Settings → Help & tips**, after **AI models** and **Local setup**. Those tabs also let you retry local setup or configure your own providers.
 
 If Keychain asks, choose **Always Allow** to remember access. See [recording help](docs/recording.md) and [permission help](docs/permissions-persistence.md) if access remains blocked.
+
+### Updating an existing installation
+
+NoteThis does not install updates automatically yet.
+
+1. Save any recording in progress, then quit NoteThis completely (**NoteThis → Quit NoteThis** or **Command-Q**).
+2. Download the newest `.dmg` from [the latest release](https://github.com/kaylafari/NoteThis/releases/latest).
+3. Open it, drag **NoteThis** into **Applications**, and choose **Replace** when asked.
+4. Open NoteThis from **Applications**, then eject the disk image.
+
+Your saved recordings, notes, settings, connected accounts, and downloaded models are stored separately from the app and are kept when you replace it. Do not use an app cleaner or delete NoteThis's application data. If macOS blocks the updated app, use the **Open Anyway** steps above.
+
+In version 0.5.4, meeting details open with the summary above the transcript. Open **Notes → Generate notes** to create the new detailed notes for an older meeting; this also refreshes its summary.
 
 ### Building from source
 
