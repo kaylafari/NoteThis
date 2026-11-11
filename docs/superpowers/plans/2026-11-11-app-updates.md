@@ -19,7 +19,7 @@
 - [x] Add failing controller tests for release validation, duplicate operations, retry, download and restart guards. Implement shared update types and desktop controller.
 - [x] Add bridge/main wiring and server busy status, with tests for untrusted IPC and active work.
 - [x] Add tested Updates settings section and compact notification; conservatively report renderer busy state.
-- [ ] Commit/push tested feature; update build to publish ZIP if native mode is verified. Document the user and release workflows.
+- [x] Commit/push tested feature; update build to publish ZIP if native mode is verified. Document the user and release workflows.
 - [ ] Validate packaged update flow, full suite/build, signatures, runtime and GitHub CI.
 - [ ] Bump release version, commit/push/tag, build installer, upload draft assets, verify hashes, publish latest and read back public URLs.
 
@@ -29,3 +29,5 @@
 - Fresh review identified restart input race/canceled-close recovery and disconnected-request work accounting. Both fixed with reproducing regressions. Follow-up review found no remaining important issues.
 - Renderer input is frozen before readiness reads and rechecked after server readiness. Canceled native closes restore ready status, input and server writes. Server tracks async mutation handlers independently of HTTP socket lifetime.
 - Implementation stays in the user's clean current checkout and authorized main branch; no parallel implementers or unrelated modifications.
+
+- Final pre-package verification: 443 tests in 32 files, TypeScript and production build passed. Feature commit f46f559 pushed.
