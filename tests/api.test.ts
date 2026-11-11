@@ -109,6 +109,64 @@ afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 describe("local API workflow", () => {
+  it("guards an update restart against new writes and resumes if canceled", async () => {
+    expect(await server.prepareForUpdate()).toBe(true);
+    try {
+      expect(
+        (await request("/settings", { method: "PUT", headers, body: "{}" }))
+          .status,
+      ).toBe(503);
+      expect((await request("/meetings")).status).toBe(200);
+    } finally {
+      server.cancelUpdateRestart();
+    }
+    expect(
+      (await request("/settings", { method: "PUT", headers, body: "{}" }))
+        .status,
+    ).toBe(200);
+  });
+  it("blocks restart until an aborted request's async handler actually finishes", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(discoverProviderModels).mockImplementationOnce(async () => {
+      started();
+      await gate;
+      return {
+        provider: "ollama",
+        kind: "llm",
+        models: [],
+        source: "account",
+        message: "fixture",
+        checkedAt: new Date().toISOString(),
+      } as any;
+    });
+    const abort = new AbortController();
+    const pending = request("/providers/ollama/models", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ kind: "llm" }),
+      signal: abort.signal,
+    }).catch(() => null);
+    await entered;
+    abort.abort();
+    await pending;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    try {
+      expect(await server.prepareForUpdate()).toBe(false);
+    } finally {
+      release();
+      server.cancelUpdateRestart();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await server.prepareForUpdate()).toBe(true);
+    server.cancelUpdateRestart();
+  });
   it("persists onboarding and exposes explicit local preparation", async () => {
     expect(await (await request("/onboarding")).json()).toEqual({
       completed: false,
@@ -277,6 +335,7 @@ describe("queued job isolation", () => {
       headers,
     });
     expect(queued.status).toBe(202);
+    expect(await server.prepareForUpdate()).toBe(false);
     await request("/settings", {
       method: "PUT",
       headers,

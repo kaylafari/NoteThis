@@ -1,5 +1,6 @@
 import {
   app,
+  autoUpdater,
   BrowserWindow,
   desktopCapturer,
   dialog,
@@ -11,6 +12,13 @@ import {
   systemPreferences,
 } from "electron";
 import path from "node:path";
+import { prepareUpdateRestart, cancelUpdateForUnload } from "./update-restart";
+import {
+  UpdateController,
+  registerUpdates,
+  fetchLatestRelease,
+  makeUpdateFeed,
+} from "./updates";
 import { preserveDesktopIdentity, showProductName } from "./identity";
 import { createSecretCodec } from "./secret-codec";
 import {
@@ -49,7 +57,15 @@ if (process.platform === "darwin") {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let server: { port: number; close: () => Promise<void> } | null = null;
+let server: {
+  port: number;
+  close: () => Promise<void>;
+  prepareForUpdate: () => Promise<boolean>;
+  cancelUpdateRestart: () => void;
+} | null = null;
+let updates: UpdateController | undefined;
+let updateTimer: ReturnType<typeof setInterval> | undefined;
+let updateStartup: ReturnType<typeof setTimeout> | undefined;
 let origin = "";
 let shuttingDown = false;
 
@@ -276,6 +292,8 @@ function createWindow() {
   });
   win.webContents.on("will-attach-webview", (event) => event.preventDefault());
   win.webContents.on("will-prevent-unload", (event) => {
+    // An update must never turn recording protection into a discard prompt.
+    if (cancelUpdateForUnload(updates)) return;
     const response = dialog.showMessageBoxSync(win, {
       type: "question",
       title: "Unsaved recording",
@@ -342,6 +360,47 @@ else {
         (url) => shell.openExternal(url),
         logBrowserEvent,
       );
+      updates = new UpdateController({
+        version: app.getVersion(),
+        supported:
+          app.isPackaged &&
+          process.platform === "darwin" &&
+          process.arch === "arm64",
+        native: autoUpdater,
+        fetchRelease: fetchLatestRelease,
+        makeFeed: makeUpdateFeed,
+        openInstaller: (url) => shell.openExternal(url),
+        canRestart: async () => {
+          const win = mainWindow;
+          if (!win || win.isDestroyed() || !server || shuttingDown)
+            return false;
+          return prepareUpdateRestart(win, server);
+        },
+        notify: (state) => {
+          if (state.status !== "restarting") {
+            server?.cancelUpdateRestart();
+            if (mainWindow && !mainWindow.isDestroyed())
+              mainWindow.setEnabled(true);
+          }
+          if (mainWindow && !mainWindow.isDestroyed())
+            mainWindow.webContents.send("notethis:update-changed", state);
+        },
+      });
+      registerUpdates(
+        ipcMain,
+        (event) =>
+          event.sender === mainWindow?.webContents &&
+          event.senderFrame === mainWindow?.webContents.mainFrame &&
+          isLocalApp(event.senderFrame?.url || ""),
+        updates,
+      );
+      updateStartup = setTimeout(() => void updates?.check(), 15000);
+      updateStartup.unref();
+      updateTimer = setInterval(
+        () => void updates?.check(),
+        6 * 60 * 60 * 1000,
+      );
+      updateTimer.unref();
       configurePermissions();
       Menu.setApplicationMenu(
         Menu.buildFromTemplate([
@@ -402,6 +461,9 @@ app.on("will-quit", (event) => {
   if (!server || shuttingDown) return;
   event.preventDefault();
   shuttingDown = true;
+  clearTimeout(updateStartup);
+  clearInterval(updateTimer);
+  updates?.dispose();
   const runningServer = server;
   server = null;
   void runningServer

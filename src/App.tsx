@@ -1,8 +1,10 @@
+import { UpdateBanner, UpdatesPanel } from "./Updates";
 import { MarkdownNotes } from "./MarkdownNotes";
 import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -306,6 +308,19 @@ export default function App() {
   }, [showRecord]);
   const upload = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const updateBusy =
+    loading ||
+    showRecord ||
+    !!working ||
+    editingTitle ||
+    showDelete ||
+    meetings.some(isBusy);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.appUpdateBusy = String(updateBusy);
+    return () => {
+      delete document.documentElement.dataset.appUpdateBusy;
+    };
+  }, [updateBusy]);
 
   function updateMeeting(value: Meeting) {
     if (selectedRef.current === value.id) setMeeting(value);
@@ -688,6 +703,7 @@ export default function App() {
             {notice}
           </div>
         )}
+        <UpdateBanner busy={updateBusy || showSettings} />
         {working && (
           <div className="working-bar" role="status">
             <Spinner />
@@ -2623,7 +2639,9 @@ export function SettingsModal({
 }) {
   const [draft, setDraft] = useState(settings);
   const [keys, setKeys] = useState<Record<string, string>>({});
-  const [section, setSection] = useState<"models" | "setup" | "help">("models");
+  const [section, setSection] = useState<
+    "models" | "setup" | "help" | "updates"
+  >("models");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -2637,6 +2655,19 @@ export function SettingsModal({
     baseUrl: settings.llm.baseUrl.trim(),
     ollamaUrl: settings.local.ollamaUrl.trim(),
   });
+  const updateSettingsBusy =
+    busy ||
+    !!authBusy ||
+    !!oauth ||
+    Object.values(keys).some((value) => value.trim()) ||
+    JSON.stringify(draft) !== JSON.stringify(settings);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.settingsUpdateBusy =
+      String(!!updateSettingsBusy);
+    return () => {
+      delete document.documentElement.dataset.settingsUpdateBusy;
+    };
+  }, [updateSettingsBusy]);
   const authOperation = useRef(false);
   const sessionId = useRef<string | null>(null);
   const authPanel = useRef<HTMLDivElement>(null);
@@ -3077,6 +3108,15 @@ export function SettingsModal({
           <HelpCircle size={16} />
           Help & tips
         </button>
+        {window.desktop?.updates && (
+          <button
+            className={section === "updates" ? "active" : ""}
+            onClick={() => setSection("updates")}
+          >
+            <ArrowDownToLine size={16} />
+            Updates
+          </button>
+        )}
       </div>
       <form onSubmit={save} onChange={() => setSaved(false)}>
         <fieldset
@@ -3470,6 +3510,8 @@ export function SettingsModal({
                 </span>
               </div>
             </>
+          ) : section === "updates" ? (
+            <UpdatesPanel busy={!!updateSettingsBusy} />
           ) : section === "help" ? (
             <HelpContent
               onLocalReady={onRefresh}
@@ -3589,7 +3631,7 @@ export function SettingsModal({
             </p>
           )}
         </fieldset>
-        {section !== "help" && (
+        {section !== "help" && section !== "updates" && (
           <footer className="settings-footer">
             <span>
               {saved ? (

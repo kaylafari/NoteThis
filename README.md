@@ -43,7 +43,9 @@ If Keychain asks, choose **Always Allow** to remember access. See [recording hel
 
 ### Updating an existing installation
 
-NoteThis does not install updates automatically yet.
+**Version 0.5.5 and newer:** open **Settings → Updates**, choose **Check for updates**, then **Download update**. When it is ready, choose **Restart to update**. NoteThis also checks when it opens and every six hours. Downloads start only when you choose them; a downloaded update installs on restart or the next launch. Finish recording, processing, and saving changes before restarting.
+
+**Version 0.5.4 and older need one final manual update** to get the updater. Use these steps, or use them as a fallback if automatic installation fails:
 
 1. Save any recording in progress, then quit NoteThis completely (**NoteThis → Quit NoteThis** or **Command-Q**).
 2. Download the newest `.dmg` from [the latest release](https://github.com/kaylafari/NoteThis/releases/latest).

@@ -4179,3 +4179,37 @@ textarea::placeholder {
   font-size: 20px;
   margin: 24px 0 4px;
 }
+
+/* Update notices stay compact and never cover the recording controls. */
+.update-banner {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #f5f0fa;
+  border-bottom: 1px solid #e5d8f0;
+  font-size: 13px;
+}
+.update-banner small {
+  display: block;
+  margin-top: 4px;
+}
+.update-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.updates-panel p {
+  line-height: 1.6;
+}
+.updates-panel .update-actions {
+  margin: 20px 0;
+}
+@media (max-width: 900px) {
+  .update-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

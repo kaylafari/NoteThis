@@ -116,6 +116,21 @@ export async function startServer(options: ServerOptions = {}) {
       await store.setSecret("oauth", JSON.stringify(value));
     },
   });
+  let updateRestarting = false;
+  let activeWrites = 0;
+  let activeHandlers = 0;
+  const trackMutation =
+    (
+      handler: import("express").RequestHandler<Record<string, string>>,
+    ): import("express").RequestHandler<Record<string, string>> =>
+    async (req, res, next) => {
+      activeHandlers++;
+      try {
+        await handler(req, res, next);
+      } finally {
+        activeHandlers--;
+      }
+    };
   const app = express();
   app.disable("x-powered-by");
   const allowedHosts = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -150,6 +165,26 @@ export async function startServer(options: ServerOptions = {}) {
         return res
           .status(403)
           .json({ error: "Missing application request header." });
+    }
+    next();
+  });
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api") && !["GET", "HEAD"].includes(req.method)) {
+      if (updateRestarting)
+        return res.status(503).json({
+          error:
+            "NoteThis is restarting to update. Try again after it reopens.",
+        });
+      activeWrites++;
+      let finished = false;
+      const done = () => {
+        if (!finished) {
+          finished = true;
+          activeWrites--;
+        }
+      };
+      res.once("finish", done);
+      res.once("close", done);
     }
     next();
   });
@@ -280,87 +315,99 @@ export async function startServer(options: ServerOptions = {}) {
   app.get("/api/onboarding", async (_req, res) =>
     res.json(await readOnboarding(dataDir)),
   );
-  app.post("/api/onboarding", async (req, res) => {
-    z.object({ completed: z.literal(true).optional() })
-      .strict()
-      .parse(req.body ?? {});
-    res.json(await completeOnboarding(dataDir));
-  });
+  app.post(
+    "/api/onboarding",
+    trackMutation(async (req, res) => {
+      z.object({ completed: z.literal(true).optional() })
+        .strict()
+        .parse(req.body ?? {});
+      res.json(await completeOnboarding(dataDir));
+    }),
+  );
   app.get("/api/local-setup", async (_req, res) =>
     res.json(await localSetup.status()),
   );
-  app.post("/api/local-setup", async (req, res) => {
-    z.object({})
-      .strict()
-      .parse(req.body ?? {});
-    res.json(await localSetup.start());
-  });
+  app.post(
+    "/api/local-setup",
+    trackMutation(async (req, res) => {
+      z.object({})
+        .strict()
+        .parse(req.body ?? {});
+      res.json(await localSetup.start());
+    }),
+  );
   app.get("/api/providers", (_req, res) => res.json(providerCatalog()));
-  app.post("/api/providers/:provider/models", async (req, res) => {
-    const input = z
-      .object({
-        kind: z.enum(["llm", "stt"]),
-        baseUrl: z.string().max(1000).optional(),
-        ollamaUrl: z.string().max(1000).optional(),
-        force: z.boolean().optional(),
-      })
-      .strict()
-      .parse(req.body);
-    const provider = modelSchema.parse(req.params.provider);
-    const saved = await store.getSettings();
-    const settings = {
-      ...saved,
-      llm: {
-        ...saved.llm,
-        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
-      },
-      local: {
-        ...saved.local,
-        ...(input.ollamaUrl !== undefined
-          ? { ollamaUrl: input.ollamaUrl }
-          : {}),
-      },
-    };
-    res.setHeader("Cache-Control", "no-store");
-    res.json(
-      await discoverProviderModels(provider, input.kind, settings, getKey, {
-        force: input.force,
-      }),
-    );
-  });
+  app.post(
+    "/api/providers/:provider/models",
+    trackMutation(async (req, res) => {
+      const input = z
+        .object({
+          kind: z.enum(["llm", "stt"]),
+          baseUrl: z.string().max(1000).optional(),
+          ollamaUrl: z.string().max(1000).optional(),
+          force: z.boolean().optional(),
+        })
+        .strict()
+        .parse(req.body);
+      const provider = modelSchema.parse(req.params.provider);
+      const saved = await store.getSettings();
+      const settings = {
+        ...saved,
+        llm: {
+          ...saved.llm,
+          ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+        },
+        local: {
+          ...saved.local,
+          ...(input.ollamaUrl !== undefined
+            ? { ollamaUrl: input.ollamaUrl }
+            : {}),
+        },
+      };
+      res.setHeader("Cache-Control", "no-store");
+      res.json(
+        await discoverProviderModels(provider, input.kind, settings, getKey, {
+          force: input.force,
+        }),
+      );
+    }),
+  );
   app.get("/api/settings", async (_req, res) =>
     res.json({
       ...(await store.getSettings()),
       oauthConnections: await getOAuthConnections(),
     }),
   );
-  app.put("/api/settings", async (req, res) => {
-    const update = settingsSchema.parse(req.body);
-    if (update.llm) {
-      const llm = update.llm;
-      if (
-        (llm.webSearch === true &&
-          llm.webSearchConsentProvider !== llm.provider) ||
-        (llm.summaryDiagrams === true &&
-          llm.summaryDiagramsConsentProvider !== llm.provider)
-      )
-        throw Object.assign(
-          new Error(
-            "Enable the feature in Settings after reviewing the data sent to the selected provider.",
-          ),
-          { status: 400 },
-        );
-    }
-    const catalog = providerCatalog();
-    if (update.stt && !catalog.stt.some((p) => p.id === update.stt!.provider))
-      throw new Error("Unknown transcription provider.");
-    if (update.llm && !catalog.llm.some((p) => p.id === update.llm!.provider))
-      throw new Error("Unknown language model provider.");
-    res.json({
-      ...(await store.updateSettings(update)),
-      oauthConnections: await getOAuthConnections(),
-    });
-  });
+  app.put(
+    "/api/settings",
+    trackMutation(async (req, res) => {
+      const update = settingsSchema.parse(req.body);
+      if (update.llm) {
+        const llm = update.llm;
+        if (
+          (llm.webSearch === true &&
+            llm.webSearchConsentProvider !== llm.provider) ||
+          (llm.summaryDiagrams === true &&
+            llm.summaryDiagramsConsentProvider !== llm.provider)
+        )
+          throw Object.assign(
+            new Error(
+              "Enable the feature in Settings after reviewing the data sent to the selected provider.",
+            ),
+            { status: 400 },
+          );
+      }
+      const catalog = providerCatalog();
+      if (update.stt && !catalog.stt.some((p) => p.id === update.stt!.provider))
+        throw new Error("Unknown transcription provider.");
+      if (update.llm && !catalog.llm.some((p) => p.id === update.llm!.provider))
+        throw new Error("Unknown language model provider.");
+      res.json({
+        ...(await store.updateSettings(update)),
+        oauthConnections: await getOAuthConnections(),
+      });
+    }),
+  );
   app.get("/api/health", async (_req, res) => {
     const settings = await store.getSettings();
     let ollama = false;
@@ -399,113 +446,129 @@ export async function startServer(options: ServerOptions = {}) {
   app.get("/api/meetings/:id", async (req, res) =>
     res.json(await getMeeting(req.params.id)),
   );
-  app.post("/api/meetings", upload.single("audio"), async (req, res) => {
-    if (!req.file)
-      return res.status(400).json({ error: "Choose an audio file." });
-    let saved = false;
-    try {
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      if (
-        ![
-          ".wav",
-          ".mp3",
-          ".mp4",
-          ".m4a",
-          ".webm",
-          ".ogg",
-          ".flac",
-          ".aac",
-          ".mpeg",
-          ".mpga",
-          ".opus",
-          ".aiff",
-        ].includes(ext)
-      )
-        throw Object.assign(
-          new Error(
-            "Unsupported audio format. Choose WAV, MP3, M4A, WebM, OGG, FLAC, AAC, MP4, or AIFF.",
-          ),
-          { status: 400 },
-        );
-      let duration = 0;
+  app.post(
+    "/api/meetings",
+    upload.single("audio"),
+    trackMutation(async (req, res) => {
+      if (!req.file)
+        return res.status(400).json({ error: "Choose an audio file." });
+      let saved = false;
       try {
-        const { stdout } = await exec(
-          resolveRuntimeBinary("ffprobe"),
-          [
-            "-v",
-            "error",
-            "-protocol_whitelist",
-            "file,pipe",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            req.file.path,
-          ],
-          { timeout: 20000 },
-        );
-        duration = Number(stdout.trim());
-        if (!Number.isFinite(duration) || duration < 0) duration = 0;
-      } catch {
-        throw Object.assign(
-          new Error(
-            "This file could not be read as audio. Install ffmpeg and check the recording.",
-          ),
-          { status: 400 },
-        );
-      }
-      const id = randomUUID();
-      const audioFile = `${id}${ext}`;
-      await rename(req.file.path, path.join(store.audioDir, audioFile));
-      saved = true;
-      const meeting: Meeting = {
-        id,
-        title: String(
-          req.body.title ||
-            path.basename(req.file.originalname, ext) ||
-            "Untitled meeting",
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        if (
+          ![
+            ".wav",
+            ".mp3",
+            ".mp4",
+            ".m4a",
+            ".webm",
+            ".ogg",
+            ".flac",
+            ".aac",
+            ".mpeg",
+            ".mpga",
+            ".opus",
+            ".aiff",
+          ].includes(ext)
         )
-          .trim()
-          .slice(0, 160),
-        createdAt: new Date().toISOString(),
-        duration,
-        status: "ready",
-        audioFile,
-        segments: [],
-        messages: [],
-      };
-      await store.save(meeting);
-      res.status(201).json(meeting);
-    } finally {
-      if (!saved) await rm(req.file.path, { force: true });
-    }
-  });
-  app.patch("/api/meetings/:id", async (req, res) => {
-    const update = z
-      .object({ title: z.string().trim().min(1).max(160) })
-      .parse(req.body);
-    res.json(
-      await withMeetingLock(req.params.id, async () =>
-        store.save({ ...(await getMeeting(req.params.id)), ...update }),
-      ),
-    );
-  });
-  app.delete("/api/meetings/:id", async (req, res) => {
-    await withMeetingLock(req.params.id, async () => {
-      await getMeeting(req.params.id);
-      await store.remove(req.params.id);
-    });
-    res.json({ ok: true });
-  });
+          throw Object.assign(
+            new Error(
+              "Unsupported audio format. Choose WAV, MP3, M4A, WebM, OGG, FLAC, AAC, MP4, or AIFF.",
+            ),
+            { status: 400 },
+          );
+        let duration = 0;
+        try {
+          const { stdout } = await exec(
+            resolveRuntimeBinary("ffprobe"),
+            [
+              "-v",
+              "error",
+              "-protocol_whitelist",
+              "file,pipe",
+              "-show_entries",
+              "format=duration",
+              "-of",
+              "default=noprint_wrappers=1:nokey=1",
+              req.file.path,
+            ],
+            { timeout: 20000 },
+          );
+          duration = Number(stdout.trim());
+          if (!Number.isFinite(duration) || duration < 0) duration = 0;
+        } catch {
+          throw Object.assign(
+            new Error(
+              "This file could not be read as audio. Install ffmpeg and check the recording.",
+            ),
+            { status: 400 },
+          );
+        }
+        const id = randomUUID();
+        const audioFile = `${id}${ext}`;
+        await rename(req.file.path, path.join(store.audioDir, audioFile));
+        saved = true;
+        const meeting: Meeting = {
+          id,
+          title: String(
+            req.body.title ||
+              path.basename(req.file.originalname, ext) ||
+              "Untitled meeting",
+          )
+            .trim()
+            .slice(0, 160),
+          createdAt: new Date().toISOString(),
+          duration,
+          status: "ready",
+          audioFile,
+          segments: [],
+          messages: [],
+        };
+        await store.save(meeting);
+        res.status(201).json(meeting);
+      } finally {
+        if (!saved) await rm(req.file.path, { force: true });
+      }
+    }),
+  );
+  app.patch(
+    "/api/meetings/:id",
+    trackMutation(async (req, res) => {
+      const update = z
+        .object({ title: z.string().trim().min(1).max(160) })
+        .parse(req.body);
+      res.json(
+        await withMeetingLock(req.params.id, async () =>
+          store.save({ ...(await getMeeting(req.params.id)), ...update }),
+        ),
+      );
+    }),
+  );
+  app.delete(
+    "/api/meetings/:id",
+    trackMutation(async (req, res) => {
+      await withMeetingLock(req.params.id, async () => {
+        await getMeeting(req.params.id);
+        await store.remove(req.params.id);
+      });
+      res.json({ ok: true });
+    }),
+  );
   app.get("/api/meetings/:id/audio", async (req, res) => {
     const m = await getMeeting(req.params.id);
     res.sendFile(path.join(store.audioDir, path.basename(m.audioFile)));
   });
-  app.post("/api/meetings/:id/transcribe", async (req, res) =>
-    res.status(202).json(await background(req.params.id, "transcribing")),
+  app.post(
+    "/api/meetings/:id/transcribe",
+    trackMutation(async (req, res) =>
+      res.status(202).json(await background(req.params.id, "transcribing")),
+    ),
   );
-  app.post("/api/meetings/:id/summarize", async (req, res) =>
-    res.status(202).json(await background(req.params.id, "summarizing")),
+  app.post(
+    "/api/meetings/:id/summarize",
+    trackMutation(async (req, res) =>
+      res.status(202).json(await background(req.params.id, "summarizing")),
+    ),
   );
 
   app.get("/api/meetings/:id/visuals/:visualId", async (req, res) => {
@@ -514,39 +577,42 @@ export async function startServer(options: ServerOptions = {}) {
       return res.status(404).json({ error: "Summary image not found." });
     res.type(visual.mimeType).send(visual.data);
   });
-  app.post("/api/meetings/:id/chat", async (req, res) => {
-    const { message } = z
-      .object({ message: z.string().trim().min(1).max(4000) })
-      .parse(req.body);
-    res.json(
-      await withMeetingLock(req.params.id, async () => {
-        const meeting = await getMeeting(req.params.id);
-        if (!meeting.segments.length)
-          throw Object.assign(
-            new Error("Transcribe the audio before asking questions."),
-            { status: 400 },
+  app.post(
+    "/api/meetings/:id/chat",
+    trackMutation(async (req, res) => {
+      const { message } = z
+        .object({ message: z.string().trim().min(1).max(4000) })
+        .parse(req.body);
+      res.json(
+        await withMeetingLock(req.params.id, async () => {
+          const meeting = await getMeeting(req.params.id);
+          if (!meeting.segments.length)
+            throw Object.assign(
+              new Error("Transcribe the audio before asking questions."),
+              { status: 400 },
+            );
+          const reply = await answerQuestion(
+            meeting.segments,
+            message,
+            meeting.messages,
+            await store.getSettings(),
+            getKey,
           );
-        const reply = await answerQuestion(
-          meeting.segments,
-          message,
-          meeting.messages,
-          await store.getSettings(),
-          getKey,
-        );
-        meeting.messages.push(
-          {
-            id: randomUUID(),
-            role: "user",
-            text: message,
-            createdAt: new Date().toISOString(),
-          },
-          reply,
-        );
-        await store.save(meeting);
-        return reply;
-      }),
-    );
-  });
+          meeting.messages.push(
+            {
+              id: randomUUID(),
+              role: "user",
+              text: message,
+              createdAt: new Date().toISOString(),
+            },
+            reply,
+          );
+          await store.save(meeting);
+          return reply;
+        }),
+      );
+    }),
+  );
   app.post("/api/oauth/:provider/start", (req, res) =>
     res.json(startOAuth(req.params.provider)),
   );
@@ -556,19 +622,25 @@ export async function startServer(options: ServerOptions = {}) {
       return res.status(404).json({ error: "Login session expired." });
     res.json(state);
   });
-  app.post("/api/oauth/session/:id/input", async (req, res) => {
-    const { text } = z.object({ text: z.string().max(8000) }).parse(req.body);
-    await submitOAuthInput(req.params.id, text);
-    res.json(getOAuthState(req.params.id));
-  });
+  app.post(
+    "/api/oauth/session/:id/input",
+    trackMutation(async (req, res) => {
+      const { text } = z.object({ text: z.string().max(8000) }).parse(req.body);
+      await submitOAuthInput(req.params.id, text);
+      res.json(getOAuthState(req.params.id));
+    }),
+  );
   app.delete("/api/oauth/session/:id", (req, res) => {
     cancelOAuth(req.params.id);
     res.json({ ok: true });
   });
-  app.delete("/api/oauth/:provider", async (req, res) => {
-    await disconnectOAuth(req.params.provider);
-    res.json({ ok: true });
-  });
+  app.delete(
+    "/api/oauth/:provider",
+    trackMutation(async (req, res) => {
+      await disconnectOAuth(req.params.provider);
+      res.json({ ok: true });
+    }),
+  );
   app.get("/api/meetings/:id/export", async (req, res) => {
     const m = await getMeeting(req.params.id);
     if (req.query.format === "latex") {
@@ -600,31 +672,34 @@ export async function startServer(options: ServerOptions = {}) {
         `# ${m.title}\n\n${m.insight?.summary || ""}${visualMarkdown}\n\n## Notes\n${m.insight?.notesMarkdown || ""}\n\n## Transcript\n${m.segments.map((s) => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")}] ${s.text}`).join("\n\n")}`,
       );
   });
-  app.post("/api/demo", async (_req, res) => {
-    const assetDir = path.join(
-      process.env.CADENCE_RESOURCE_DIR || process.cwd(),
-      "assets",
-    );
-    const sample = JSON.parse(
-      await readFile(path.join(assetDir, "sample-meeting.json"), "utf8"),
-    ) as Meeting;
-    const id = randomUUID();
-    const audioFile = `${id}.wav`;
-    await copyFile(
-      path.join(assetDir, "sample-meeting.wav"),
-      path.join(store.audioDir, audioFile),
-    );
-    res.status(201).json(
-      await store.save({
-        ...sample,
-        id,
-        audioFile,
-        title: "Sample · Launch planning",
-        createdAt: new Date().toISOString(),
-        messages: [],
-      }),
-    );
-  });
+  app.post(
+    "/api/demo",
+    trackMutation(async (_req, res) => {
+      const assetDir = path.join(
+        process.env.CADENCE_RESOURCE_DIR || process.cwd(),
+        "assets",
+      );
+      const sample = JSON.parse(
+        await readFile(path.join(assetDir, "sample-meeting.json"), "utf8"),
+      ) as Meeting;
+      const id = randomUUID();
+      const audioFile = `${id}.wav`;
+      await copyFile(
+        path.join(assetDir, "sample-meeting.wav"),
+        path.join(store.audioDir, audioFile),
+      );
+      res.status(201).json(
+        await store.save({
+          ...sample,
+          id,
+          audioFile,
+          title: "Sample · Launch planning",
+          createdAt: new Date().toISOString(),
+          messages: [],
+        }),
+      );
+    }),
+  );
   const staticDir = options.staticDir || path.resolve("dist");
   try {
     await access(path.join(staticDir, "index.html"));
@@ -681,6 +756,29 @@ export async function startServer(options: ServerOptions = {}) {
   );
   return {
     port: (server.address() as import("node:net").AddressInfo).port,
+    prepareForUpdate: async () => {
+      // Freeze new writes before awaiting setup state. Existing handlers remain counted after disconnect.
+      updateRestarting = true;
+      try {
+        const setup = await localSetup.status();
+        if (
+          busy.size ||
+          activeWrites ||
+          activeHandlers ||
+          setup.state === "running"
+        ) {
+          updateRestarting = false;
+          return false;
+        }
+        return true;
+      } catch (error) {
+        updateRestarting = false;
+        throw error;
+      }
+    },
+    cancelUpdateRestart: () => {
+      updateRestarting = false;
+    },
     close: async () => {
       await localSetup.close();
       await new Promise<void>((resolve, reject) => {

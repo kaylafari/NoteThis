@@ -70,12 +70,30 @@ await withUnlockedLocalSigningIdentity(identity, async (verified) => {
     "verify installer disk image",
   );
 });
-const hash = createHash("sha256");
-for await (const chunk of createReadStream(artifact)) hash.update(chunk);
-await writeFile(
-  `${artifact}.sha256`,
-  `${hash.digest("hex")}  ${path.basename(artifact)}\n`,
+// Native Squirrel installs the signed app from ZIP; the DMG remains the first-install fallback.
+const archive = artifact.replace(/\.dmg$/, ".zip");
+const zipped = spawnSync(
+  "/usr/bin/ditto",
+  [
+    "-c",
+    "-k",
+    "--sequesterRsrc",
+    "--keepParent",
+    path.join(root, "release/installer/mac-arm64/NoteThis.app"),
+    archive,
+  ],
+  { stdio: "inherit" },
 );
+if (zipped.status !== 0)
+  throw new Error("Could not create the signed update archive.");
+for (const file of [artifact, archive]) {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  await writeFile(
+    `${file}.sha256`,
+    `${hash.digest("hex")}  ${path.basename(file)}\n`,
+  );
+}
 console.log(
   `Installer ready: ${artifact}\nLocally signed; not Apple-notarized. macOS may require Open Anyway in Privacy & Security.`,
 );
