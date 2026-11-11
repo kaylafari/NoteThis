@@ -20,8 +20,8 @@
 - [x] Add bridge/main wiring and server busy status, with tests for untrusted IPC and active work.
 - [x] Add tested Updates settings section and compact notification; conservatively report renderer busy state.
 - [x] Commit/push tested feature; update build to publish ZIP if native mode is verified. Document the user and release workflows.
-- [ ] Validate packaged update flow, full suite/build, signatures, runtime and GitHub CI.
-- [ ] Bump release version, commit/push/tag, build installer, upload draft assets, verify hashes, publish latest and read back public URLs.
+- [x] Validate packaged update flow, full suite/build, signatures, runtime and GitHub CI.
+- [x] Bump release version, commit/push/tag, build installer, upload draft assets, verify hashes, publish latest and read back public URLs.
 
 ## Execution evidence and rulings
 
@@ -33,3 +33,7 @@
 - Final pre-package verification: 443 tests in 32 files, TypeScript and production build passed. Feature commit f46f559 pushed.
 
 - Final banner regression reproduced a hidden download error and verified the fix. All 443 tests and build pass again. The unpublished 0.5.5 candidate is superseded by 0.5.6; no published tag is moved.
+
+- Published v0.5.6 as latest: https://github.com/kaylafari/NoteThis/releases/tag/v0.5.6. Installer and update ZIP returned HTTP 200; production discovery accepted 0.5.6 for an older client and rejected a self-update for 0.5.6.
+- Mounted-app smoke passed the Updates tab and live GitHub check, saved audio/settings, timestamp seeking, Overview/Notes rendering and bundled runtime health. ZIP signature and app contents matched the DMG. All four uploaded asset digests matched local files.
+- Final release-tag and main checks passed (43120123309 and 43120119721). DMG SHA-256: fc11ca3268e387a3b7a44d98353d3866cb0688c33a43cca40f23713c50c030c7. ZIP SHA-256: 2b23578b8c99c6b7cf32f9e49301e8bf189141621cd9cf09b7469f7407147fc6.
