@@ -175,7 +175,7 @@ const latexInstructions = String.raw`Write the summary field as a LaTeX document
 const latexEscapedToken = JSON.stringify(String.raw`\textbf{...}`);
 const preserveQuantitativeEvidence =
   "Preserve exact formulas, symbols, units, numerical data, coordinate pairs, and associated labels when stated, with their source segment IDs. Do not alter values, infer missing measurements, or invent formulas. ";
-const finalPrefix = `Write a concise factual meeting summary and extract explicit decisions and action commitments from the evidence below. Each action must describe a real task from the meeting. Copy the exact owner name, deadline, and source segment ID when stated; otherwise use an empty string. Never invent a task, owner, or date. Use empty arrays when no decisions or actions were stated. ${latexInstructions}One LaTeX token encoded as a JSON string: ${latexEscapedToken}. This illustrates escaping only; do not copy placeholder text. Your summary must report the actual meeting facts, numerical values, and tasks from the evidence below. Never return generic headings in place of meeting content. Extract every explicit task commitment into actions, with its stated owner and deadline.\nReturn only JSON matching this schema:\n${JSON.stringify(insightSchema)}\n\nTRANSCRIPT EVIDENCE:\n`;
+const finalPrefix = `Write a concise factual meeting summary and extract explicit substantive decisions from the evidence below. Do not create action items, follow-up sections or task checklists. Return an empty actions array for backward compatibility. ${latexInstructions}One LaTeX token encoded as a JSON string: ${latexEscapedToken}. Report only actual source facts.\nReturn only JSON matching this schema:\n${JSON.stringify(insightSchema)}\n\nTRANSCRIPT EVIDENCE:\n`;
 const extractPrefix =
   "Extract a concise factual account of this section, explicit decisions, and explicit action commitments. Preserve exact source segment IDs in brackets, owners and dates when stated. Aim for under 2000 characters. Do not add facts.\n\nTRANSCRIPT SECTION:\n";
 const reducePrefix =
@@ -380,7 +380,7 @@ export async function summarize(
       );
     notes = reduced;
   }
-  progress("Writing summary and action items");
+  progress("Writing summary");
   const raw = await boundedGenerate(
     prefix + notes.join("\n\n"),
     settings,
@@ -390,6 +390,7 @@ export async function summarize(
   const insight = parseInsight(raw, segments);
   // Only this new generation path promises LaTeX; imported/older notes retain their format.
   insight.summaryFormat = "latex";
+  insight.actions = [];
   if (allowVisual) {
     try {
       const plan = visualPlan(raw, segments);

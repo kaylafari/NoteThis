@@ -58,11 +58,6 @@ export const api = {
     request<Meeting>(`/meetings/${id}/transcribe`, { method: "POST" }),
   summarize: (id: string) =>
     request<Meeting>(`/meetings/${id}/summarize`, { method: "POST" }),
-  action: (id: string, actionId: string, done: boolean) =>
-    request<Meeting>(`/meetings/${id}/actions/${actionId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ done }),
-    }),
   chat: (id: string, message: string) =>
     request<ChatMessage>(`/meetings/${id}/chat`, {
       method: "POST",

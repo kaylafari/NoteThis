@@ -300,7 +300,7 @@ Net growth is \textbf{positive}: $g=\frac{12}{100}$.
     expect(tex).toContain("ybar");
     expect(tex).toContain(String.raw`\end{document}`);
   });
-  it("escapes all plain metadata, decisions and action fields", () => {
+  it("escapes metadata and decisions while omitting retired action items", () => {
     const tex = exportLatexMeeting({
       ...meeting,
       title: String.raw`Bad \input{secret} & 20% $5_1 # ~ ^`,
@@ -310,8 +310,8 @@ Net growth is \textbf{positive}: $g=\frac{12}{100}$.
       String.raw`Bad \textbackslash{}input\{secret\} \& 20\% \$5\_1 \# \textasciitilde{} \textasciicircum{}`,
     );
     expect(tex).toContain(String.raw`Keep \$5 \& 10\%`);
-    expect(tex).toContain(String.raw`Prepare report\_1`);
-    expect(tex).toContain(String.raw`Mia \& Lee`);
+    expect(tex).not.toContain("Action items");
+    expect(tex).not.toContain("Prepare report");
     expect(tex).not.toContain(String.raw`\input{secret}`);
   });
   it("escapes legacy plain notes instead of executing apparent TeX", () => {

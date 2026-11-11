@@ -32,6 +32,7 @@ import {
   disconnectOAuth,
   cancelOAuth,
 } from "./oauth.js";
+import { generateNotes } from "./notes.js";
 import { summarize, answerQuestion } from "./intelligence.js";
 const exec = promisify(execFile);
 export type ServerOptions = {
@@ -244,7 +245,16 @@ export async function startServer(options: ServerOptions = {}) {
           meeting.progress = "Transcription saved. Creating meeting notes";
           await store.save(meeting);
         }
+        const previousNotes = meeting.insight?.notesMarkdown;
         meeting.insight = await summarize(
+          meeting.segments,
+          settings,
+          getKey,
+          updateProgress,
+        );
+        meeting.insight.notesMarkdown = previousNotes;
+        await store.save(meeting);
+        meeting.insight.notesMarkdown = await generateNotes(
           meeting.segments,
           settings,
           getKey,
@@ -497,21 +507,7 @@ export async function startServer(options: ServerOptions = {}) {
   app.post("/api/meetings/:id/summarize", async (req, res) =>
     res.status(202).json(await background(req.params.id, "summarizing")),
   );
-  app.patch("/api/meetings/:id/actions/:actionId", async (req, res) => {
-    const { done } = z.object({ done: z.boolean() }).parse(req.body);
-    res.json(
-      await withMeetingLock(req.params.id, async () => {
-        const meeting = await getMeeting(req.params.id);
-        const action = meeting.insight?.actions.find(
-          (a) => a.id === req.params.actionId,
-        );
-        if (!action)
-          throw Object.assign(new Error("Action not found."), { status: 404 });
-        action.done = done;
-        return store.save(meeting);
-      }),
-    );
-  });
+
   app.get("/api/meetings/:id/visuals/:visualId", async (req, res) => {
     const visual = await store.getVisual(req.params.id, req.params.visualId);
     if (!visual)
@@ -601,7 +597,7 @@ export async function startServer(options: ServerOptions = {}) {
     res
       .type("text/markdown")
       .send(
-        `# ${m.title}\n\n${m.insight?.summary || ""}${visualMarkdown}\n\n## Actions\n${m.insight?.actions.map((a) => `- [${a.done ? "x" : " "}] ${a.text}${a.owner ? " — " + a.owner : ""}${a.due ? " (" + a.due + ")" : ""}`).join("\n") || ""}\n\n## Transcript\n${m.segments.map((s) => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")}] ${s.text}`).join("\n\n")}`,
+        `# ${m.title}\n\n${m.insight?.summary || ""}${visualMarkdown}\n\n## Notes\n${m.insight?.notesMarkdown || ""}\n\n## Transcript\n${m.segments.map((s) => `[${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")}] ${s.text}`).join("\n\n")}`,
       );
   });
   app.post("/api/demo", async (_req, res) => {

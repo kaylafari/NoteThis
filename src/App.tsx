@@ -1,3 +1,4 @@
+import { MarkdownNotes } from "./MarkdownNotes";
 import {
   memo,
   useCallback,
@@ -280,9 +281,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"transcript" | "summary" | "actions">(
-    "transcript",
-  );
+  const [tab, setTab] = useState<"transcript" | "notes">("transcript");
+  useEffect(() => {
+    setTab("transcript");
+  }, [selected]);
   const [showSettings, setShowSettings] = useState(false);
   const [showRecord, setShowRecord] = useState(false);
   const [showChat, setShowChat] = useState(() => window.innerWidth > 820);
@@ -484,7 +486,7 @@ export default function App() {
   }
   function exportNotes() {
     if (!meeting) return;
-    const body = `# ${meeting.title}\n\n${new Date(meeting.createdAt).toLocaleString()}\n\n${meeting.insight ? `## Summary\n\n${meeting.insight.summary}\n\n## Decisions\n\n${meeting.insight.decisions.map((d) => `- ${d}`).join("\n")}\n\n## Action items\n\n${meeting.insight.actions.map((a) => `- [${a.done ? "x" : " "}] ${a.text}${a.owner ? ` — ${a.owner}` : ""}${a.due ? ` (${a.due})` : ""}`).join("\n")}\n\n` : ""}## Transcript\n\n${meeting.segments.map((s) => `[${time(s.start)}] ${s.speaker ? `${s.speaker}: ` : ""}${s.text}`).join("\n\n")}`;
+    const body = `# ${meeting.title}\n\n${new Date(meeting.createdAt).toLocaleString()}\n\n${meeting.insight ? `## Summary\n\n${meeting.insight.summary}\n\n## Decisions\n\n${meeting.insight.decisions.map((d) => `- ${d}`).join("\n")}\n\n## Notes\n\n${meeting.insight.notesMarkdown || ""}\n\n` : ""}## Transcript\n\n${meeting.segments.map((s) => `[${time(s.start)}] ${s.speaker ? `${s.speaker}: ` : ""}${s.text}`).join("\n\n")}`;
     const url = URL.createObjectURL(
       new Blob([body], { type: "text/markdown" }),
     );
@@ -497,7 +499,7 @@ export default function App() {
   const filtered = meetings.filter((item) =>
     item.title.toLowerCase().includes(search.toLowerCase()),
   );
-  const actions = meeting?.insight?.actions || [];
+
   const visibleSegments =
     meeting?.segments.filter((segment) =>
       segment.text.toLowerCase().includes(transcriptSearch.toLowerCase()),
@@ -807,28 +809,16 @@ export default function App() {
                       onClick={() => setTab("transcript")}
                     >
                       <FileText size={16} />
-                      Transcript
+                      Overview
                     </button>
                     <button
                       role="tab"
-                      aria-selected={tab === "summary"}
-                      className={tab === "summary" ? "active" : ""}
-                      onClick={() => setTab("summary")}
+                      aria-selected={tab === "notes"}
+                      className={tab === "notes" ? "active" : ""}
+                      onClick={() => setTab("notes")}
                     >
                       <Sparkles size={16} />
-                      Summary
-                    </button>
-                    <button
-                      role="tab"
-                      aria-selected={tab === "actions"}
-                      className={tab === "actions" ? "active" : ""}
-                      onClick={() => setTab("actions")}
-                    >
-                      <CheckCheck size={17} />
-                      Action items
-                      {actions.length > 0 && (
-                        <span className="tab-count">{actions.length}</span>
-                      )}
+                      Notes
                     </button>
                   </div>
                   <IconButton
@@ -877,305 +867,268 @@ export default function App() {
                     <Spinner />
                   </div>
                 )}
-                {tab === "transcript" && (
-                  <>
-                    <div className="transcript-tools">
-                      <label className="transcript-search">
-                        <Search size={15} />
-                        <input
-                          aria-label="Search transcript"
-                          placeholder="Search transcript"
-                          value={transcriptSearch}
-                          onChange={(e) => setTranscriptSearch(e.target.value)}
-                        />
-                        {transcriptSearch && (
-                          <button
-                            aria-label="Clear transcript search"
-                            onClick={() => setTranscriptSearch("")}
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </label>
-                      <button
-                        className={`follow-button ${follow ? "on" : ""}`}
-                        onClick={() => setFollow(!follow)}
-                        aria-pressed={follow}
-                      >
-                        <span className="toggle-track">
-                          <span />
-                        </span>
-                        Follow audio
-                      </button>
-                    </div>
+                <div
+                  role="tabpanel"
+                  aria-label="Overview"
+                  className={
+                    tab === "transcript" ? "overview-scroll" : "overview-hidden"
+                  }
+                >
+                  {tab === "transcript" && (
                     <div
-                      className="transcript-scroll"
-                      role="tabpanel"
-                      aria-label="Transcript"
+                      className="overview-summary"
+                      role="region"
+                      aria-label="Summary"
                     >
-                      {visibleSegments.length ? (
+                      {meeting.insight ? (
                         <>
-                          {meeting.timing === "estimated" && (
-                            <p className="timing-note">
-                              Word highlighting uses estimated timing for this
-                              provider.
+                          <div className="notes-heading">
+                            <span className="section-eyebrow">
+                              THE BIG PICTURE
+                            </span>
+                            <button
+                              className="inline-link"
+                              disabled={isBusy(meeting)}
+                              onClick={() =>
+                                void run("Refreshing notes", async () =>
+                                  updateMeeting(
+                                    await api.summarize(meeting.id),
+                                  ),
+                                )
+                              }
+                            >
+                              Regenerate <Sparkles size={12} />
+                            </button>
+                          </div>
+                          <h2>Summary</h2>
+                          {meeting.insight.summaryFormat === "latex" ? (
+                            <LatexSummary source={meeting.insight.summary} />
+                          ) : (
+                            <p className="summary-copy">
+                              {meeting.insight.summary}
                             </p>
                           )}
-                          {visibleSegments.map((segment) => (
-                            <TranscriptSegment
-                              key={segment.id}
-                              segment={segment}
-                              active={activeSegment?.id === segment.id}
-                              position={
-                                activeSegment?.id === segment.id ? position : -1
-                              }
-                              seek={seek}
-                              search={transcriptSearch}
-                            />
-                          ))}
-                          <div className="transcript-end">
-                            <span /> End of transcript <span />
+                          <div className="summary-export">
+                            <button
+                              className="inline-link"
+                              onClick={exportLatex}
+                            >
+                              <ArrowDownToLine size={14} /> Export LaTeX (.tex)
+                            </button>
+                            {meeting.insight.summaryFormat === "latex" && (
+                              <details className="summary-source">
+                                <summary>View LaTeX source</summary>
+                                <pre>{meeting.insight.summary}</pre>
+                              </details>
+                            )}
+                          </div>
+                          <div className="section-divider" />
+                          <div className="section-label">
+                            <span className="small-icon">
+                              <CheckCheck size={18} />
+                            </span>
+                            <h3>Key decisions</h3>
+                            <span>{meeting.insight.decisions.length}</span>
+                          </div>
+                          {meeting.insight.decisions.length ? (
+                            <ul className="decision-list">
+                              {meeting.insight.decisions.map((decision, i) => (
+                                <li key={i}>
+                                  <span>{String(i + 1).padStart(2, "0")}</span>
+                                  <p>{decision}</p>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="muted">
+                              No explicit decisions were identified.
+                            </p>
+                          )}
+                          <MeetingVisuals insight={meeting.insight} />
+                          <div className="summary-footer">
+                            <Sparkles size={14} />
+                            AI-generated notes. Check important details against
+                            the transcript.
                           </div>
                         </>
-                      ) : meeting.segments.length ? (
-                        <div className="content-empty">
-                          <Search size={26} />
-                          <h3>No matching passages</h3>
-                          <p>Try another word or phrase.</p>
-                        </div>
-                      ) : !isBusy(meeting) ? (
-                        <div className="content-empty">
-                          <span className="empty-icon">
-                            <FileText size={28} />
-                          </span>
-                          <h3>Your transcript starts here</h3>
-                          <p>
-                            Transcribe the audio to read along, find moments,
-                            <br />
-                            and turn the conversation into clear next steps.
-                          </p>
-                          <button
-                            className="button primary"
-                            disabled={!!working}
-                            onClick={() =>
-                              void run("Starting transcription", async () =>
-                                updateMeeting(await api.transcribe(meeting.id)),
-                              )
-                            }
-                          >
-                            <Sparkles size={16} />
-                            Transcribe audio
-                          </button>
-                          <button
-                            className="inline-link"
-                            onClick={() => setShowSettings(true)}
-                          >
-                            Using{" "}
-                            {settings?.stt.model ||
-                              "your selected speech model"}{" "}
-                            <Settings2 size={13} />
-                          </button>
-                        </div>
-                      ) : null}
+                      ) : (
+                        <NotesEmpty
+                          hasTranscript={!!meeting.segments.length}
+                          busy={isBusy(meeting) || !!working}
+                          onGenerate={() =>
+                            void run("Creating notes", async () =>
+                              updateMeeting(await api.summarize(meeting.id)),
+                            )
+                          }
+                        />
+                      )}
                     </div>
-                  </>
-                )}
-                {tab === "summary" && (
-                  <div
-                    className="notes-scroll"
-                    role="tabpanel"
-                    aria-label="Summary"
-                  >
-                    {meeting.insight ? (
-                      <>
-                        <div className="notes-heading">
-                          <span className="section-eyebrow">
-                            THE BIG PICTURE
-                          </span>
-                          <button
-                            className="inline-link"
-                            disabled={isBusy(meeting)}
-                            onClick={() =>
-                              void run("Refreshing notes", async () =>
-                                updateMeeting(await api.summarize(meeting.id)),
-                              )
+                  )}
+                  {tab === "transcript" && (
+                    <>
+                      <h2 className="transcript-heading">Transcript</h2>
+                      <div className="transcript-tools">
+                        <label className="transcript-search">
+                          <Search size={15} />
+                          <input
+                            aria-label="Search transcript"
+                            placeholder="Search transcript"
+                            value={transcriptSearch}
+                            onChange={(e) =>
+                              setTranscriptSearch(e.target.value)
                             }
-                          >
-                            Regenerate <Sparkles size={12} />
-                          </button>
-                        </div>
-                        <h2>A conversation, distilled.</h2>
-                        {meeting.insight.summaryFormat === "latex" ? (
-                          <LatexSummary source={meeting.insight.summary} />
-                        ) : (
-                          <p className="summary-copy">
-                            {meeting.insight.summary}
-                          </p>
-                        )}
-                        <div className="summary-export">
-                          <button className="inline-link" onClick={exportLatex}>
-                            <ArrowDownToLine size={14} /> Export LaTeX (.tex)
-                          </button>
-                          {meeting.insight.summaryFormat === "latex" && (
-                            <details className="summary-source">
-                              <summary>View LaTeX source</summary>
-                              <pre>{meeting.insight.summary}</pre>
-                            </details>
+                          />
+                          {transcriptSearch && (
+                            <button
+                              aria-label="Clear transcript search"
+                              onClick={() => setTranscriptSearch("")}
+                            >
+                              <X size={14} />
+                            </button>
                           )}
-                        </div>
-                        <div className="section-divider" />
-                        <div className="section-label">
-                          <span className="small-icon">
-                            <CheckCheck size={18} />
+                        </label>
+                        <button
+                          className={`follow-button ${follow ? "on" : ""}`}
+                          onClick={() => setFollow(!follow)}
+                          aria-pressed={follow}
+                        >
+                          <span className="toggle-track">
+                            <span />
                           </span>
-                          <h3>Key decisions</h3>
-                          <span>{meeting.insight.decisions.length}</span>
-                        </div>
-                        {meeting.insight.decisions.length ? (
-                          <ul className="decision-list">
-                            {meeting.insight.decisions.map((decision, i) => (
-                              <li key={i}>
-                                <span>{String(i + 1).padStart(2, "0")}</span>
-                                <p>{decision}</p>
-                              </li>
+                          Follow audio
+                        </button>
+                      </div>
+                      <div
+                        className="transcript-scroll"
+                        role="region"
+                        aria-label="Transcript"
+                      >
+                        {visibleSegments.length ? (
+                          <>
+                            {meeting.timing === "estimated" && (
+                              <p className="timing-note">
+                                Word highlighting uses estimated timing for this
+                                provider.
+                              </p>
+                            )}
+                            {visibleSegments.map((segment) => (
+                              <TranscriptSegment
+                                key={segment.id}
+                                segment={segment}
+                                active={activeSegment?.id === segment.id}
+                                position={
+                                  activeSegment?.id === segment.id
+                                    ? position
+                                    : -1
+                                }
+                                seek={seek}
+                                search={transcriptSearch}
+                              />
                             ))}
-                          </ul>
-                        ) : (
-                          <p className="muted">
-                            No explicit decisions were identified.
-                          </p>
-                        )}
-                        <MeetingVisuals insight={meeting.insight} />
-                        <div className="summary-footer">
-                          <Sparkles size={14} />
-                          AI-generated notes. Check important details against
-                          the transcript.
-                        </div>
-                      </>
-                    ) : (
-                      <NotesEmpty
-                        hasTranscript={!!meeting.segments.length}
-                        busy={isBusy(meeting) || !!working}
-                        onGenerate={() =>
-                          void run("Creating notes", async () =>
-                            updateMeeting(await api.summarize(meeting.id)),
-                          )
-                        }
-                      />
-                    )}
-                  </div>
-                )}
-                {tab === "actions" && (
+                            <div className="transcript-end">
+                              <span /> End of transcript <span />
+                            </div>
+                          </>
+                        ) : meeting.segments.length ? (
+                          <div className="content-empty">
+                            <Search size={26} />
+                            <h3>No matching passages</h3>
+                            <p>Try another word or phrase.</p>
+                          </div>
+                        ) : !isBusy(meeting) ? (
+                          <div className="content-empty">
+                            <span className="empty-icon">
+                              <FileText size={28} />
+                            </span>
+                            <h3>Your transcript starts here</h3>
+                            <p>
+                              Transcribe the audio to read along, find moments,
+                              <br />
+                              and turn the conversation into clear next steps.
+                            </p>
+                            <button
+                              className="button primary"
+                              disabled={!!working}
+                              onClick={() =>
+                                void run("Starting transcription", async () =>
+                                  updateMeeting(
+                                    await api.transcribe(meeting.id),
+                                  ),
+                                )
+                              }
+                            >
+                              <Sparkles size={16} />
+                              Transcribe audio
+                            </button>
+                            <button
+                              className="inline-link"
+                              onClick={() => setShowSettings(true)}
+                            >
+                              Using{" "}
+                              {settings?.stt.model ||
+                                "your selected speech model"}{" "}
+                              <Settings2 size={13} />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {tab === "notes" && (
                   <div
                     className="notes-scroll"
                     role="tabpanel"
-                    aria-label="Action items"
+                    aria-label="Notes"
                   >
-                    {meeting.insight ? (
-                      <>
-                        <span className="section-eyebrow">
-                          FROM TALK TO TO-DO
-                        </span>
-                        <div className="actions-title">
-                          <h2>Make the next move.</h2>
-                          <span>
-                            {actions.filter((item) => item.done).length} of{" "}
-                            {actions.length} complete
-                          </span>
-                        </div>
-                        <div className="action-progress">
-                          <span
-                            style={{
-                              width: `${actions.length ? (actions.filter((item) => item.done).length / actions.length) * 100 : 0}%`,
-                            }}
-                          />
-                        </div>
-                        <div className="action-list">
-                          {actions.length ? (
-                            actions.map((action) => (
-                              <div
-                                key={action.id}
-                                className={`action-card ${action.done ? "done" : ""}`}
-                              >
-                                <button
-                                  className="action-checkbox"
-                                  aria-label={`${action.done ? "Mark incomplete" : "Complete"}: ${action.text}`}
-                                  aria-pressed={action.done}
-                                  onClick={() =>
-                                    void run("Updating action", async () =>
-                                      updateMeeting(
-                                        await api.action(
-                                          meeting.id,
-                                          action.id,
-                                          !action.done,
-                                        ),
-                                      ),
-                                    )
-                                  }
-                                  disabled={!!working}
-                                >
-                                  {action.done && <Check size={14} />}
-                                </button>
-                                <div>
-                                  <p>{action.text}</p>
-                                  <div className="action-meta">
-                                    {action.owner && (
-                                      <span className="owner-chip">
-                                        {action.owner}
-                                      </span>
-                                    )}
-                                    {action.due && (
-                                      <span>
-                                        <Clock3 size={12} />
-                                        {action.due}
-                                      </span>
-                                    )}
-                                    {action.segmentId &&
-                                      meeting.segments.some(
-                                        (s) => s.id === action.segmentId,
-                                      ) && (
-                                        <button
-                                          className="inline-link"
-                                          onClick={() => {
-                                            const s = meeting.segments.find(
-                                              (s) => s.id === action.segmentId,
-                                            );
-                                            if (s) {
-                                              setTab("transcript");
-                                              seek(s.start);
-                                            }
-                                          }}
-                                        >
-                                          View in transcript{" "}
-                                          <ArrowRight size={12} />
-                                        </button>
-                                      )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="content-empty">
-                              <CheckCheck size={28} />
-                              <h3>No action items identified</h3>
-                              <p>
-                                This conversation didn’t include explicit next
-                                steps.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <NotesEmpty
-                        hasTranscript={!!meeting.segments.length}
-                        busy={isBusy(meeting) || !!working}
-                        onGenerate={() =>
+                    <div className="notes-heading">
+                      <h2>Notes</h2>
+                      <button
+                        className="inline-link"
+                        disabled={
+                          isBusy(meeting) ||
+                          !!working ||
+                          !meeting.segments.length
+                        }
+                        onClick={() =>
                           void run("Creating notes", async () =>
                             updateMeeting(await api.summarize(meeting.id)),
                           )
                         }
-                      />
+                      >
+                        {meeting.insight?.notesMarkdown
+                          ? "Regenerate notes"
+                          : "Generate notes"}
+                        <Sparkles size={12} />
+                      </button>
+                    </div>
+                    {meeting.insight?.notesMarkdown ? (
+                      <>
+                        <MarkdownNotes source={meeting.insight.notesMarkdown} />
+                        <button
+                          className="inline-link"
+                          onClick={() => {
+                            const blob = new Blob(
+                              [meeting.insight!.notesMarkdown!],
+                              { type: "text/markdown" },
+                            );
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `${meeting.title || "meeting"}-notes.md`;
+                            a.click();
+                            setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          }}
+                        >
+                          Export Markdown (.md)
+                        </button>
+                      </>
+                    ) : (
+                      <p className="muted">
+                        {isBusy(meeting)
+                          ? "Your notes are being prepared…"
+                          : "Generate detailed topic notes from this recording’s transcript."}
+                      </p>
                     )}
                   </div>
                 )}
@@ -1610,8 +1563,8 @@ function NotesEmpty({
       <h3>The useful part, all together.</h3>
       <p>
         {hasTranscript
-          ? "Create a concise summary, capture decisions,\nand find the next steps in your conversation."
-          : "Transcribe your recording first to create\na summary, decisions, and action items."}
+          ? "Create a concise summary and detailed notes\nfrom your conversation."
+          : "Transcribe your recording first to create\na summary and detailed notes."}
       </p>
       <button
         className="button primary"
@@ -1721,8 +1674,7 @@ export function MeetingVisuals({ insight }: { insight: Insight }) {
       ))}
       {insight.visualError && (
         <p className="visual-notice" role="status">
-          {insight.visualError} Your summary and action items are still
-          available.
+          {insight.visualError} Your summary and notes are still available.
         </p>
       )}
       {rejected && (

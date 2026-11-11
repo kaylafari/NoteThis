@@ -175,7 +175,7 @@ describe("local API workflow", () => {
     expect((await r.arrayBuffer()).byteLength).toBe(44);
     expect(r.headers.get("content-range")).toContain("0-43/32044");
   });
-  it("runs transcription then summary and preserves actions and chat", async () => {
+  it("runs transcription then summary and saves detailed notes and preserves chat", async () => {
     const response = await request("/meetings/fixture/transcribe", {
       method: "POST",
       headers,
@@ -189,12 +189,16 @@ describe("local API workflow", () => {
     }
     expect(meeting.status).toBe("ready");
     expect(meeting.segments[0].words[0].text).toBe("Maya");
-    expect(meeting.insight.actions[0].owner).toBe("Maya");
-    const action = await request(
-      `/meetings/fixture/actions/${meeting.insight.actions[0].id}`,
-      { method: "PATCH", headers, body: '{"done":true}' },
-    );
-    expect((await action.json()).insight.actions[0].done).toBe(true);
+    expect(meeting.insight.actions).toEqual([]);
+    expect(meeting.insight.notesMarkdown).toContain("Maya");
+    const action = await request("/meetings/fixture/actions/removed", {
+      method: "PATCH",
+      headers,
+      body: '{"done":true}',
+    });
+    expect(action.status).toBe(404);
+    const exported = await (await request("/meetings/fixture/export")).text();
+    expect(exported).not.toContain("## Actions");
     const chat = await request("/meetings/fixture/chat", {
       method: "POST",
       headers,

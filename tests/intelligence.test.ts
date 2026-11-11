@@ -169,7 +169,7 @@ describe("bounded long-meeting intelligence", () => {
       ),
     ).toBe(true);
   });
-  it("reduces every section into bounded final evidence and preserves late action references", async () => {
+  it("reduces every section into bounded final evidence and preserves late evidence without generating tasks", async () => {
     const long = Array.from({ length: 120 }, (_, i) => ({
       id: `s${i}`,
       start: i * 10,
@@ -201,7 +201,7 @@ describe("bounded long-meeting intelligence", () => {
     expect(seen.size).toBe(120);
     expect(reductions).toBeGreaterThan(1);
     for (let i = 0; i < 120; i++) expect(finalEvidence).toContain(`[s${i}]`);
-    expect(notes.actions[0].segmentId).toBe("s119");
+    expect(notes.actions).toEqual([]);
     expect(model.mock.calls.at(-1)?.[4]?.jsonSchema).toEqual(insightSchema);
     expect(
       model.mock.calls.slice(0, -1).every((call) => !call[4]?.jsonSchema),
@@ -555,7 +555,7 @@ describe("consented capability-gated rich intelligence", () => {
 });
 
 describe("LaTeX summary generation", () => {
-  it("requests a constrained LaTeX body with correctly escaped JSON, while keeping actions plain", async () => {
+  it("requests a constrained LaTeX body with correctly escaped JSON, without generating action items", async () => {
     const summary = String.raw`\section{Measurements}
 \textbf{Force} is \(F = 12\,N\).
 \[F = ma\]
@@ -617,20 +617,12 @@ describe("LaTeX summary generation", () => {
     expect(prompt).not.toContain(
       "JSON escaping example (format only, not meeting evidence)",
     );
-    expect(prompt).toContain(
-      "actual meeting facts, numerical values, and tasks",
-    );
-    expect(prompt).toContain(
-      "Extract every explicit task commitment into actions",
-    );
+    expect(prompt).toContain("Report only actual source facts");
+    expect(prompt).toContain("Return an empty actions array");
     expect(result.summary).toBe(summary);
     expect(result.summaryFormat).toBe("latex");
     expect(result.decisions).toEqual(["Keep the measurements"]);
-    expect(result.actions[0]).toMatchObject({
-      text: "Send proposal",
-      owner: "Maya",
-      due: "Friday",
-    });
+    expect(result.actions).toEqual([]);
     assertBudgets();
   });
 

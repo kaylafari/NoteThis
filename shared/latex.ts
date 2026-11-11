@@ -562,17 +562,9 @@ export function exportLatexMeeting(meeting: Meeting): string {
   const decisions = (insight?.decisions ?? [])
     .slice(0, 200)
     .map((text) => `\\item ${escapeText(text)}`);
-  const actions = (insight?.actions ?? [])
-    .slice(0, 200)
-    .map(
-      (action) =>
-        `\\item ${escapeText(action.done ? "[Done] " : "[Open] ")}${escapeText(action.text)}${action.owner ? ` \\textbf{Owner:} ${escapeText(action.owner)}` : ""}${action.due ? ` \\textbf{Due:} ${escapeText(action.due)}` : ""}`,
-    );
   if ((insight?.decisions.length ?? 0) > 200)
     decisions.push(
       "\\item [Additional decisions omitted: export limit is 200.]",
     );
-  if ((insight?.actions.length ?? 0) > 200)
-    actions.push("\\item [Additional actions omitted: export limit is 200.]");
-  return `\\documentclass[11pt]{article}\n\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amsmath,amssymb,booktabs,pgfplots}\n\\pgfplotsset{compat=1.18}\n\\title{${escapeText(meeting.title)}}\n\\author{NoteThis}\n\\date{${escapeText(meeting.createdAt)}}\n\\begin{document}\n\\maketitle\n\n${content}\n\n\\section*{Decisions}\n${decisions.length ? `\\begin{itemize}\n${decisions.join("\n")}\n\\end{itemize}` : "No decisions recorded."}\n\n\\section*{Action items}\n${actions.length ? `\\begin{itemize}\n${actions.join("\n")}\n\\end{itemize}` : "No action items recorded."}\n\\end{document}\n`;
+  return `\\documentclass[11pt]{article}\n\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amsmath,amssymb,booktabs,pgfplots}\n\\pgfplotsset{compat=1.18}\n\\title{${escapeText(meeting.title)}}\n\\author{NoteThis}\n\\date{${escapeText(meeting.createdAt)}}\n\\begin{document}\n\\maketitle\n\n${content}\n\n\\section*{Decisions}\n${decisions.length ? `\\begin{itemize}\n${decisions.join("\n")}\n\\end{itemize}` : "No decisions recorded."}\n\\end{document}\n`;
 }

@@ -309,12 +309,12 @@ export function HelpContent({
           <span className="help-step-number">04</span>
           <h3>Turn a meeting into next steps</h3>
           <p>
-            Open <strong>Summary</strong> for the overview and decisions, and{" "}
-            <strong>Actions</strong> to check off tasks. Rich summaries can
-            include LaTeX formulas, tables, and charts; you can view their
-            source or export them. Use <strong>Ask this meeting</strong> to ask
-            about the call, then follow its timestamp citations back to the
-            recording.
+            Open <strong>Overview</strong> for the summary and transcript, and{" "}
+            <strong>Notes</strong> for detailed topic notes. Notes support
+            Markdown, tables, code, and equations. Rich summaries can include
+            LaTeX formulas, tables, and charts; you can view their source or
+            export them. Use <strong>Ask this meeting</strong> to ask about the
+            call, then follow its timestamp citations back to the recording.
           </p>
         </section>
       </div>

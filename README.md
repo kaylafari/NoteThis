@@ -4,7 +4,7 @@
 
 ## TLDR
 
-Record a call or upload an audio file. NoteThis turns it into a written transcript, a meeting summary, and a to-do list. Listen back with the words highlighted as they are spoken, or ask questions about what was discussed.
+Record a call or upload an audio file. NoteThis turns it into a written transcript, a meeting summary, and detailed topic notes. Listen back with the words highlighted as they are spoken, or ask questions about what was discussed.
 
 Your recordings and notes are saved on your Mac. Use AI on your computer or connect a supported online service.
 
@@ -15,7 +15,7 @@ Your recordings and notes are saved on your Mac. Use AI on your computer or conn
 - **Record both sides of a call.** Capture your microphone and the audio playing on your computer, or choose just one.
 - **Use recordings you already have.** Upload common audio files, including MP3, M4A, and WAV.
 - **Read and listen together.** Follow the highlighted words during playback. Click a word or timestamp to jump to that part of the recording.
-- **Get clean, structured notes.** Read formatted summaries with headings, lists, formulas, tables, and simple charts when the meeting supports them. Review decisions and check off action items.
+- **Get clean, structured notes.** Read formatted summaries with headings, lists, formulas, tables, and simple charts when the meeting supports them. Read the summary above the transcript, or open Notes for detailed topic sections.
 - **Ask your meeting a question.** Try “What did we decide?” or “What do I need to do next?” Jump to the supporting audio from the answer.
 - **Add research and diagrams.** Enable web search for questions or useful summary diagrams in Settings when your chosen model supports them. Both start off.
 - **Keep a copy.** Export your notes and transcript, download a diagram, or choose **Export LaTeX (.tex)** in the summary for an editable document.
@@ -49,7 +49,7 @@ Developers can follow the [setup guide](docs/development.md#fresh-setup). Existi
 
 1. Load the sample meeting to explore without recording, or choose **Record meeting** or **Import audio**.
 2. For a call, choose your audio sources, start recording, then stop and save when finished. Headphones help prevent echo.
-3. Wait for the transcript and notes. Play the recording, review your actions, or open **Ask this meeting**.
+3. Wait for the transcript and notes. Play the recording, read the summary above the transcript or open **Notes**, or open **Ask this meeting**.
 
 New summaries use LaTeX formatting automatically. To update an older summary, open it and click **Regenerate**. Formulas and data charts do not require an image-generating AI model.
 
@@ -62,3 +62,9 @@ Connect online services in **Settings** using browser sign-in or an **API key** 
 Online services receive the audio or transcript needed for the task. Web search and diagram settings explain what is shared before you enable them. Features depend on your service and account.
 
 For more detail, see [supported services](docs/providers.md), [model and feature settings](docs/model-discovery.md), or the [developer guide](docs/development.md).
+
+### Meeting overview and detailed notes
+
+Opening a meeting shows **Overview**, with the summary above the synchronized transcript. **Notes** contains detailed Markdown notes organized by topic, using the transcript as evidence. Notes support tables, code blocks, and LaTeX equations. They omit action-item lists and routine follow-up logistics.
+
+New recordings generate both views with your selected language model. For existing meetings, open **Notes → Generate notes**; this refreshes the summary and creates detailed notes. Notes can be exported as Markdown. Long recordings are processed section by section without dropping later sections. The Notes generator has no plotting or image tools, so it uses tables or text diagrams when useful. Optional summary diagrams remain a separate setting.

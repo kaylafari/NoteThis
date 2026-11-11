@@ -4103,3 +4103,79 @@ textarea::placeholder {
 .help-account .button {
   margin-top: 4px;
 }
+
+/* Overview keeps the summary and synchronized transcript in one scroll surface. */
+.overview-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.overview-hidden {
+  display: none;
+}
+.overview-summary {
+  padding: 24px 8px 24px 1px;
+  border-bottom: 1px solid var(--line);
+}
+.overview-summary h2 {
+  margin: 16px 0;
+  font-size: 24px;
+}
+.overview-scroll .transcript-scroll {
+  overflow: visible;
+  flex: none;
+}
+.markdown-notes {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.markdown-notes h1 {
+  font-size: 25px;
+  margin: 20px 0;
+}
+.markdown-notes h2 {
+  font-size: 20px;
+  margin: 24px 0 12px;
+}
+.markdown-notes h3 {
+  font-size: 16px;
+  margin: 20px 0 10px;
+}
+.markdown-notes p,
+.markdown-notes ul,
+.markdown-notes ol {
+  margin: 12px 0;
+}
+.markdown-notes ul,
+.markdown-notes ol {
+  padding-left: 24px;
+}
+.markdown-notes pre {
+  overflow: auto;
+  padding: 14px;
+  background: #f5f5f7;
+  border-radius: 8px;
+}
+.markdown-notes table {
+  display: block;
+  overflow: auto;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+.markdown-notes th,
+.markdown-notes td {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+}
+.markdown-notes .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 0;
+}
+
+.transcript-heading {
+  font-size: 20px;
+  margin: 24px 0 4px;
+}
