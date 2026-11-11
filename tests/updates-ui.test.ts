@@ -10,7 +10,7 @@ test("update UI handles available, busy, downloaded, and failed updates", async 
   try {
     const bundled = await build({
       stdin: {
-        contents: `import React from 'react';import{createRoot}from'react-dom/client';import{UpdatesPanel}from'./src/Updates';let listener;window.actions=[];let state={currentVersion:'0.5.4',status:'available',version:'0.5.5',native:true};window.desktop={isElectron:true,platform:'darwin',appVersion:'0.5.4',updates:{state:async()=>state,subscribe:fn=>{listener=fn;return()=>{}},action:async action=>{window.actions.push(action);state={...state,status:action==='download'?'downloading':state.status};listener(state);return state}}};let root=createRoot(document.getElementById('root'));window.mount=(busy=false)=>root.render(React.createElement(UpdatesPanel,{busy}));window.emit=s=>{state={...state,...s};listener(state)};window.mount();`,
+        contents: `import React from 'react';import{createRoot}from'react-dom/client';import{UpdatesPanel,UpdateBanner}from'./src/Updates';let listener;window.actions=[];let state={currentVersion:'0.5.4',status:'available',version:'0.5.5',native:true};window.desktop={isElectron:true,platform:'darwin',appVersion:'0.5.4',updates:{state:async()=>state,subscribe:fn=>{listener=fn;return()=>{}},action:async action=>{window.actions.push(action);state={...state,status:action==='download'?'downloading':state.status};listener(state);return state}}};let root=createRoot(document.getElementById('root'));window.mount=(busy=false,banner=false)=>root.render(React.createElement(banner?UpdateBanner:UpdatesPanel,{busy}));window.emit=s=>{state={...state,...s};listener(state)};window.mount();`,
         resolveDir: process.cwd(),
         loader: "tsx",
       },
@@ -62,6 +62,12 @@ test("update UI handles available, busy, downloaded, and failed updates", async 
       );
       button("Download installer")!.click();
       await wait(() => w.actions.includes("installer"));
+      w.mount(false, true);
+      await wait(
+        () =>
+          document.querySelector(".update-banner") &&
+          document.body.innerText.includes("Could not verify update"),
+      );
       return true;
     };
     await writeFile(

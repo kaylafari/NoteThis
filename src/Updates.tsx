@@ -154,7 +154,10 @@ export function UpdatesPanel({ busy = false }: { busy?: boolean }) {
 export function UpdateBanner({ busy = false }: { busy?: boolean }) {
   const { state, act } = useUpdates();
   if (
-    !["available", "downloading", "ready", "restarting"].includes(state.status)
+    !["available", "downloading", "ready", "restarting"].includes(
+      state.status,
+    ) &&
+    !(state.status === "error" && state.version)
   )
     return null;
   return (
