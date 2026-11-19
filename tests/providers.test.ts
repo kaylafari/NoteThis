@@ -357,7 +357,7 @@ describe("speech adapter wire formats", () => {
     );
     await expect(
       generateText("system", "question", settings, async () => undefined),
-    ).rejects.toThrow("ollama pull qwen3:0.6b");
+    ).rejects.toThrow(/qwen3:0.6b.*Settings.*Prepare local AI/);
   });
   it("uses local Ollama without reading cloud credentials", async () => {
     mock.mockResolvedValue(

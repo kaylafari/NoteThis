@@ -77,7 +77,7 @@ class Encoder {
   mimeType = "audio/webm;codecs=opus";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
-  onerror: (() => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
   constructor(public stream: Stream) {
     encoders.push(this);
   }
@@ -268,6 +268,19 @@ describe("call recorder source integrity", () => {
 });
 
 describe("permission request feedback", () => {
+  it("does not silently resume a failed encoder and preserves captured bytes", async () => {
+    const onError = vi.fn();
+    const recorder = createCallRecorder({ onError });
+    await recorder.start();
+    encoders[0].ondataavailable?.({ data: new Blob(["recoverable audio"]) });
+    encoders[0].state = "inactive";
+    encoders[0].onerror?.(new Event("error"));
+    expect(recorder.state).toBe("paused");
+    expect(() => recorder.resume()).toThrow(/Finish recording/);
+    expect(recorder.state).toBe("paused");
+    const result = await recorder.stop();
+    expect(await result.blob.text()).toBe("recoverable audio");
+  });
   it("waits for the actual system request before reporting an actionable denial", async () => {
     vi.stubGlobal("window", {
       desktop: { isElectron: true, platform: "darwin" },

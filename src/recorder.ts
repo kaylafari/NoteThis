@@ -136,7 +136,11 @@ export function createCallRecorder(options: RecorderOptions = {}) {
   }
 
   function resume() {
-    if (state !== "paused" || !recorder || recorder.state !== "paused") return;
+    if (state !== "paused") return;
+    if (!recorder || recorder.state !== "paused" || recorderError)
+      throw new Error(
+        "Audio capture has stopped. Choose Finish recording to recover captured audio, then start a new recording.",
+      );
     const ended = streams.some((stream) =>
       stream.getTracks().some((track) => track.readyState !== "live"),
     );

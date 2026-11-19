@@ -243,6 +243,7 @@ export async function startServer(options: ServerOptions = {}) {
       throw error;
     }
     const work = async () => {
+      let transcriptSaved = kind === "summarizing";
       const updateProgress = (progress: string) => {
         meeting.progress = progress;
       };
@@ -279,6 +280,7 @@ export async function startServer(options: ServerOptions = {}) {
           meeting.status = "summarizing";
           meeting.progress = "Transcription saved. Creating meeting notes";
           await store.save(meeting);
+          transcriptSaved = true;
         }
         const previousNotes = meeting.insight?.notesMarkdown;
         meeting.insight = await summarize(
@@ -297,8 +299,11 @@ export async function startServer(options: ServerOptions = {}) {
         );
         meeting.status = "ready";
       } catch (error) {
+        const notesFailed = transcriptSaved && meeting.status === "summarizing";
         meeting.status = "error";
-        meeting.error = safeError(error);
+        meeting.error = notesFailed
+          ? `Notes generation failed. Your audio and transcript are saved. ${safeError(error)}`
+          : safeError(error);
       } finally {
         clearInterval(timer);
         await progressWrite;

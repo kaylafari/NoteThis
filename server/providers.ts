@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { missingOllamaModelMessage } from "../shared/ollama.js";
 import { resolvePythonPath, resolveRuntimeBinary } from "./local-setup.js";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -854,9 +855,7 @@ export async function generateText(
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes("HTTP 404"))
-        throw new Error(
-          `Ollama could not find the selected model. Run ollama pull ${modelId} on the Ollama server, then try again.`,
-        );
+        throw new Error(missingOllamaModelMessage(modelId, base));
       throw error;
     }
     const result = str(obj(data.message).content).trim();

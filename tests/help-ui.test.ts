@@ -212,7 +212,7 @@ test("first-launch guidance persists across ports, remains in settings, and prep
         "The permanent help tab reuses the welcome guide",
       );
       await until(
-        () => button("Check local AI"),
+        () => button("Verify & repair local AI"),
         "Help reconnects to preparation state",
       );
       if (button("Save preferences"))
@@ -234,8 +234,19 @@ test("first-launch guidance persists across ports, remains in settings, and prep
         throw new Error("Guide changed provider without user selection");
       button("Local setup").click();
       await until(
-        () => button("Check local AI") && text().includes("Python executable"),
+        () =>
+          button("Verify & repair local AI") &&
+          text().includes("Python executable"),
         "Local setup exposes the same preparation control",
+      );
+      button("Verify & repair local AI").click();
+      await until(
+        () => !!document.querySelector('[data-state="running"]'),
+        "Ready state can start a real verification and repair",
+      );
+      await until(
+        () => !!document.querySelector('[data-state="ready"]'),
+        "Explicit repair finishes without changing preferences",
       );
       const python = [...document.querySelectorAll("label")]
         .find((label) => label.textContent?.includes("Python executable"))!
@@ -329,7 +340,7 @@ test("first-launch guidance persists across ports, remains in settings, and prep
     expect(result.passed.length).toBeGreaterThanOrEqual(25);
     expect(result.portsDiffer).toBe(true);
     expect(result.remoteRequests).toBe(0);
-    expect(result.starts).toBe(2);
+    expect(result.starts).toBe(3);
     expect(result.mutations.every((call: any) => call.header === "1")).toBe(
       true,
     );

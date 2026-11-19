@@ -33,6 +33,23 @@
   --font:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 }
+.recording-model-check {
+  padding: 12px;
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.recording-model-check p + p {
+  margin-top: 8px;
+}
+.recording-model-check > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
 * {
   box-sizing: border-box;
 }

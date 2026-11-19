@@ -54,7 +54,7 @@ vi.mock("../server/model-discovery", () => ({
 }));
 import { discoverProviderModels } from "../server/model-discovery";
 import { startServer } from "../server/index";
-import { transcribeAudio } from "../server/providers";
+import { transcribeAudio, generateText } from "../server/providers";
 let dataDir: string,
   base: string,
   server: Awaited<ReturnType<typeof startServer>>;
@@ -266,6 +266,59 @@ describe("local API workflow", () => {
     expect(
       (await (await request("/meetings/fixture")).json()).messages,
     ).toHaveLength(2);
+  });
+  it("preserves audio and transcript after a missing notes model and retries without retranscription", async () => {
+    const original = await (await request("/meetings/fixture")).json();
+    await writeFile(
+      path.join(dataDir, "meetings", "missing-notes-model.json"),
+      JSON.stringify({
+        ...original,
+        id: "missing-notes-model",
+        segments: [],
+        insight: undefined,
+        messages: [],
+      }),
+    );
+    vi.mocked(generateText).mockRejectedValueOnce(
+      new Error("Ollama could not find the selected notes model qwen3:0.6b"),
+    );
+    const result = await request("/meetings/missing-notes-model/transcribe", {
+      method: "POST",
+      headers,
+    });
+    expect(result.status).toBe(202);
+    const settled = async () => {
+      for (let i = 0; i < 100; i++) {
+        const meeting = await (
+          await request("/meetings/missing-notes-model")
+        ).json();
+        if (!["transcribing", "summarizing"].includes(meeting.status))
+          return meeting;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      throw Error("Processing did not settle");
+    };
+    const failed = await settled();
+    expect(failed.status).toBe("error");
+    expect(failed.error).toContain("Your audio and transcript are saved");
+    expect(failed.error).toContain("qwen3:0.6b");
+    expect(failed.segments).toHaveLength(1);
+    expect((await request("/meetings/missing-notes-model/audio")).status).toBe(
+      200,
+    );
+    const transcriptionCalls = vi.mocked(transcribeAudio).mock.calls.length;
+    expect(
+      (
+        await request("/meetings/missing-notes-model/summarize", {
+          method: "POST",
+          headers,
+        })
+      ).status,
+    ).toBe(202);
+    expect((await settled()).status).toBe("ready");
+    expect(vi.mocked(transcribeAudio).mock.calls.length).toBe(
+      transcriptionCalls,
+    );
   });
   it("does not reveal saved API keys", async () => {
     const r = await request("/settings", {

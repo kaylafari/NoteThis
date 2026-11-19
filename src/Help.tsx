@@ -98,7 +98,7 @@ export function LocalPreparation({
     : running
       ? "Preparing local AI…"
       : status?.state === "ready"
-        ? "Check local AI"
+        ? "Verify & repair local AI"
         : status?.state === "error"
           ? "Retry preparation"
           : "Prepare local AI";
@@ -117,9 +117,7 @@ export function LocalPreparation({
         type="button"
         className="button primary"
         disabled={busy || (running && !error) || (!status && !error)}
-        onClick={() =>
-          void (error || status?.state === "ready" ? check() : prepare())
-        }
+        onClick={() => void (error ? check() : prepare())}
       >
         {busy || (running && !error) ? (
           <LoaderCircle size={15} className="spin" />

@@ -67,6 +67,31 @@ test("recording permissions stay pending until their source succeeds or rejects"
       const w = window as any;
       const passed: string[] = [];
       const saved: any[] = [];
+      let missing = true;
+      let discoveryRequests = 0;
+      let delayedDiscovery: (() => void) | undefined;
+      let delayDiscovery = false;
+      w.fetch = async (url: string, options: any) => {
+        if (url === "/api/settings")
+          return Response.json({
+            llm: { provider: "ollama", model: "qwen3:0.6b" },
+            local: { ollamaUrl: "http://127.0.0.1:11434" },
+          });
+        if (url === "/api/providers/ollama/models") {
+          discoveryRequests++;
+          if (!JSON.parse(options.body).force)
+            throw Error("Readiness must bypass discovery cache");
+          if (delayDiscovery)
+            await new Promise<void>((resolve) => {
+              delayedDiscovery = resolve;
+            });
+          return Response.json({
+            source: "local",
+            models: missing ? [] : ["qwen3:0.6b"],
+          });
+        }
+        throw Error("Unexpected network request: " + url);
+      };
       let closed = 0;
       const text = () => document.getElementById("root")!.textContent || "";
       const wait = () => new Promise((resolve) => setTimeout(resolve, 15));
@@ -131,6 +156,19 @@ test("recording permissions stay pending until their source succeeds or rejects"
       await mount();
       await check(
         () =>
+          text().includes("qwen3:0.6b") && text().includes("Prepare local AI"),
+        "Missing notes model is explained before recording",
+      );
+      await check(
+        () => !button("Start recording").disabled,
+        "Missing notes model never blocks audio capture",
+      );
+      missing = false;
+      delayDiscovery = true;
+      await mount();
+      await until(() => !!delayedDiscovery, "Fresh model check started");
+      await check(
+        () =>
           text().includes(
             "Starting will request microphone and system audio / screen-sharing access",
           ),
@@ -181,24 +219,49 @@ test("recording permissions stay pending until their source succeeds or rejects"
         "Pending system-sharing request remains non-error state",
       );
       w.syntheticRecorder.succeed();
+      missing = true;
+      delayedDiscovery!();
       await check(
         () =>
           text().includes("RECORDING LIVE") && !status().includes("Requesting"),
         "Successful permissions clear pending status and enter recording",
       );
+      await wait();
+      await check(
+        () =>
+          !text().includes("Prepare local AI") &&
+          !document.querySelector('[role="alert"]'),
+        "Late missing-model result cannot interrupt active capture",
+      );
+      delayDiscovery = false;
+      missing = false;
       await click("Pause");
+      w.syntheticRecorder.options.onError(
+        new Error("Synthetic recording interruption"),
+      );
       await check(
         () => text().includes("PAUSED") && w.syntheticRecorder.pauses === 1,
         "Pause remains available after permission grant",
       );
       await click("Resume");
       await check(
+        () => !document.querySelector('[role="alert"]'),
+        "Successful resume clears the previous capture error",
+      );
+      await check(
         () =>
           text().includes("RECORDING LIVE") &&
           w.syntheticRecorder.resumes === 1,
         "Resume retains recording lifecycle",
       );
+      w.syntheticRecorder.options.onError(
+        new Error("Synthetic recording interruption"),
+      );
       await click("Finish recording");
+      await check(
+        () => !document.querySelector('[role="alert"]'),
+        "Recovered audio is not shown with a stale failure",
+      );
       await check(
         () =>
           text().includes("CAPTURE COMPLETE") &&

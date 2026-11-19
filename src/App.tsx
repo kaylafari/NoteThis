@@ -1,5 +1,6 @@
 import { UpdateBanner, UpdatesPanel } from "./Updates";
 import { MarkdownNotes } from "./MarkdownNotes";
+import { RecordingModelCheck } from "./RecordingModelCheck";
 import {
   memo,
   useCallback,
@@ -815,7 +816,9 @@ export default function App() {
                   <div className="meeting-error">
                     <HelpCircle size={18} />
                     <div>
-                      <strong>Something needs attention</strong>
+                      <strong>
+                        Processing “{meeting.title}” needs attention
+                      </strong>
                       <p>{meeting.error}</p>
                       <button
                         className="inline-link"
@@ -1388,6 +1391,10 @@ export default function App() {
       {showRecord && (
         <RecordingModal
           onClose={() => setShowRecord(false)}
+          onSettings={() => {
+            setShowRecord(false);
+            setShowSettings(true);
+          }}
           onSave={storeRecording}
           saving={working === "Saving recording"}
         />
@@ -1865,10 +1872,12 @@ export function ChatPanel({
 }
 export function RecordingModal({
   onClose,
+  onSettings,
   onSave,
   saving,
 }: {
   onClose: () => void;
+  onSettings?: () => void;
   onSave: (file: File, title: string) => Promise<void>;
   saving: boolean;
 }) {
@@ -1954,6 +1963,7 @@ export function RecordingModal({
     try {
       const result = await recorder.current!.stop();
       setCaptured(result);
+      setError("");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -2006,6 +2016,7 @@ export function RecordingModal({
             </label>
             {state === "idle" && !captured ? (
               <>
+                {!starting && <RecordingModelCheck onSettings={onSettings} />}
                 <div className="source-options">
                   <button
                     className={mic ? "selected" : ""}
@@ -2201,6 +2212,7 @@ export function RecordingModal({
                       try {
                         if (state === "paused") recorder.current?.resume();
                         else recorder.current?.pause();
+                        setError("");
                       } catch (error) {
                         setError((error as Error).message);
                       }
