@@ -4,6 +4,7 @@ import { createCallRecorder, SYSTEM_AUDIO_ERROR } from "../src/recorder";
 class Track extends EventTarget {
   readyState = "live";
   stopped = false;
+  muted = false;
   constructor(public kind: "audio" | "video") {
     super();
   }
@@ -41,12 +42,16 @@ class Node {
   }
 }
 let contexts: FakeAudioContext[];
-class FakeAudioContext {
-  resume = vi.fn(async () => {});
+class FakeAudioContext extends EventTarget {
+  state = "running";
+  resume = vi.fn(async () => {
+    this.state = "running";
+  });
   close = vi.fn(async () => {});
   destination = new Node();
   sourceStreams: Stream[] = [];
   constructor() {
+    super();
     contexts.push(this);
   }
   createMediaStreamDestination() {
@@ -189,13 +194,20 @@ describe("call recorder source integrity", () => {
   });
 
   it("pauses and reports source disconnection while keeping recorded bytes saveable", async () => {
-    const onError = vi.fn();
-    const recorder = createCallRecorder({ onError });
+    const onRecovery = vi.fn();
+    const recorder = createCallRecorder({ onRecovery });
     await recorder.start();
     display.getAudioTracks()[0].disconnectSource();
     expect(recorder.state).toBe("paused");
-    expect(onError).toHaveBeenCalledOnce();
-    expect(() => recorder.resume()).toThrow("disconnected");
+    expect(onRecovery).toHaveBeenLastCalledWith(
+      expect.stringContaining("Resume"),
+      false,
+    );
+    const replacement = new Stream([new Track("audio"), new Track("video")]);
+    getDisplayMedia.mockResolvedValueOnce(replacement);
+    await recorder.resume();
+    expect(recorder.state).toBe("recording");
+    expect(encoders).toHaveLength(1);
     expect((await recorder.stop()).blob.size).toBeGreaterThan(0);
   });
 
@@ -207,7 +219,7 @@ describe("call recorder source integrity", () => {
     now = 1000;
     recorder.pause();
     now = 9000;
-    recorder.resume();
+    await recorder.resume();
     now = 9500;
     expect((await recorder.stop()).durationMs).toBe(1500);
     microphone = new Stream([new Track("audio")]);
@@ -255,14 +267,21 @@ describe("call recorder source integrity", () => {
   });
 
   it("pauses when screen sharing ends even if the system audio track stays live", async () => {
-    const onError = vi.fn();
-    const recorder = createCallRecorder({ onError });
+    const onRecovery = vi.fn();
+    const recorder = createCallRecorder({ onRecovery });
     await recorder.start();
     display.getVideoTracks()[0].disconnectSource();
     expect(display.getAudioTracks()[0].readyState).toBe("live");
     expect(recorder.state).toBe("paused");
-    expect(onError).toHaveBeenCalledOnce();
-    expect(() => recorder.resume()).toThrow("disconnected");
+    expect(onRecovery).toHaveBeenLastCalledWith(
+      expect.stringContaining("Resume"),
+      false,
+    );
+    const replacement = new Stream([new Track("audio"), new Track("video")]);
+    getDisplayMedia.mockResolvedValueOnce(replacement);
+    await recorder.resume();
+    expect(recorder.state).toBe("recording");
+    expect(encoders).toHaveLength(1);
     expect((await recorder.stop()).blob.size).toBeGreaterThan(0);
   });
 });
@@ -276,7 +295,7 @@ describe("permission request feedback", () => {
     encoders[0].state = "inactive";
     encoders[0].onerror?.(new Event("error"));
     expect(recorder.state).toBe("paused");
-    expect(() => recorder.resume()).toThrow(/Finish recording/);
+    await expect(recorder.resume()).rejects.toThrow(/Finish recording/);
     expect(recorder.state).toBe("paused");
     const result = await recorder.stop();
     expect(await result.blob.text()).toBe("recoverable audio");
@@ -408,5 +427,217 @@ describe("permission request feedback", () => {
     deny(new DOMException("Denied", "NotAllowedError"));
     await rejected;
     expect(contexts).toHaveLength(0);
+  });
+});
+
+describe("recording reconnection", () => {
+  it("keeps captured bytes when permission is denied, then allows retry", async () => {
+    const recorder = createCallRecorder();
+    await recorder.start();
+    encoders[0].ondataavailable?.({ data: new Blob(["before-sleep"]) });
+    display.getAudioTracks()[0].disconnectSource();
+    getDisplayMedia.mockRejectedValueOnce(
+      new DOMException("Denied", "NotAllowedError"),
+    );
+    await expect(recorder.resume()).rejects.toThrow("access was not granted");
+    expect(recorder.state).toBe("paused");
+    const replacement = new Stream([new Track("audio")]);
+    getDisplayMedia.mockResolvedValueOnce(replacement);
+    await recorder.resume();
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(encoders).toHaveLength(1);
+    expect(await (await recorder.stop()).blob.text()).toContain("before-sleep");
+  });
+  it("requests replacement display synchronously and stops late streams after Finish", async () => {
+    const recorder = createCallRecorder();
+    await recorder.start();
+    display.getVideoTracks()[0].disconnectSource();
+    let resolve!: (stream: Stream) => void;
+    getDisplayMedia.mockImplementationOnce(
+      () =>
+        new Promise<Stream>((r) => {
+          resolve = r;
+        }),
+    );
+    const pending = recorder.resume();
+    expect(getDisplayMedia).toHaveBeenCalledTimes(2);
+    await recorder.stop();
+    const late = new Stream([new Track("audio")]);
+    resolve(late);
+    await expect(pending).rejects.toThrow("cancelled");
+    expect(late.getTracks()[0].stopped).toBe(true);
+    expect(recorder.state).toBe("idle");
+  });
+  it("automatically resumes recovered muted tracks but respects a manual pause", async () => {
+    const recorder = createCallRecorder();
+    await recorder.start();
+    const track = microphone.getAudioTracks()[0];
+    track.muted = true;
+    track.dispatchEvent(new Event("mute"));
+    expect(recorder.state).toBe("paused");
+    track.muted = false;
+    track.dispatchEvent(new Event("unmute"));
+    await vi.waitFor(() => expect(recorder.state).toBe("recording"));
+    recorder.pause();
+    track.dispatchEvent(new Event("unmute"));
+    await Promise.resolve();
+    expect(recorder.state).toBe("paused");
+    recorder.dispose();
+  });
+  it("pauses on system sleep, auto-resumes on wake, and excludes the sleep gap", async () => {
+    let notify!: (state: string) => void;
+    const unsubscribe = vi.fn();
+    vi.stubGlobal(
+      "window",
+      Object.assign(new EventTarget(), {
+        desktop: {
+          onPowerState: (callback: any) => {
+            notify = callback;
+            return unsubscribe;
+          },
+        },
+      }),
+    );
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const recorder = createCallRecorder();
+    await recorder.start();
+    now = 1000;
+    notify("suspend");
+    expect(recorder.state).toBe("paused");
+    now = 100000;
+    notify("resume");
+    await vi.waitFor(() => expect(recorder.state).toBe("recording"));
+    now = 101000;
+    expect((await recorder.stop()).durationMs).toBe(2000);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+});
+
+describe("reconnection controls and cancellation", () => {
+  it("serializes repeated Resume clicks and releases a late replacement after discard", async () => {
+    const recorder = createCallRecorder();
+    await recorder.start();
+    microphone.getAudioTracks()[0].disconnectSource();
+    let deliver!: (stream: Stream) => void;
+    getUserMedia.mockImplementationOnce(
+      () =>
+        new Promise<Stream>((resolve) => {
+          deliver = resolve;
+        }),
+    );
+    const first = recorder.resume();
+    const second = recorder.resume();
+    expect(first).toBe(second);
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    recorder.dispose();
+    const late = new Stream([new Track("audio")]);
+    deliver(late);
+    await expect(first).rejects.toThrow("cancelled");
+    expect(late.getTracks()[0].stopped).toBe(true);
+  });
+  it("auto-recovers a microphone on devicechange without reopening system sharing", async () => {
+    const devices = Object.assign(new EventTarget(), {
+      getUserMedia,
+      getDisplayMedia,
+    });
+    vi.stubGlobal("navigator", { mediaDevices: devices });
+    const recorder = createCallRecorder();
+    await recorder.start();
+    microphone.getAudioTracks()[0].disconnectSource();
+    getUserMedia.mockResolvedValueOnce(new Stream([new Track("audio")]));
+    devices.dispatchEvent(new Event("devicechange"));
+    await vi.waitFor(() => expect(recorder.state).toBe("recording"));
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1);
+    recorder.dispose();
+  });
+  it("never opens system sharing automatically on wake and supports opting out", async () => {
+    let power!: (value: string) => void;
+    vi.stubGlobal(
+      "window",
+      Object.assign(new EventTarget(), {
+        desktop: {
+          onPowerState: (callback: any) => {
+            power = callback;
+            return () => {};
+          },
+        },
+      }),
+    );
+    const recorder = createCallRecorder();
+    await recorder.start();
+    display.getAudioTracks()[0].disconnectSource();
+    power("resume");
+    await Promise.resolve();
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1);
+    expect(recorder.state).toBe("paused");
+    getDisplayMedia.mockResolvedValueOnce(new Stream([new Track("audio")]));
+    await recorder.resume();
+    recorder.setAutoResume(false);
+    power("suspend");
+    power("resume");
+    await Promise.resolve();
+    expect(recorder.state).toBe("paused");
+    await recorder.resume();
+    recorder.pause();
+    power("suspend");
+    power("resume");
+    expect(recorder.state).toBe("paused");
+    recorder.dispose();
+  });
+  it("revives a suspended AudioContext without creating another encoder", async () => {
+    const surface = new EventTarget();
+    vi.stubGlobal("window", surface);
+    const recorder = createCallRecorder();
+    await recorder.start();
+    contexts[0].state = "suspended";
+    contexts[0].dispatchEvent(new Event("statechange"));
+    expect(recorder.state).toBe("paused");
+    surface.dispatchEvent(new Event("focus"));
+    await vi.waitFor(() => expect(recorder.state).toBe("recording"));
+    expect(contexts[0].resume).toHaveBeenCalledTimes(2);
+    expect(encoders).toHaveLength(1);
+    recorder.dispose();
+  });
+});
+
+describe("late recovery and truthful capture state", () => {
+  it("manual Pause wins over a pending automatic resume", async () => {
+    const recorder = createCallRecorder();
+    await recorder.start();
+    const track = microphone.getAudioTracks()[0];
+    track.muted = true;
+    track.dispatchEvent(new Event("mute"));
+    let resolve!: () => void;
+    contexts[0].resume.mockImplementationOnce(
+      () =>
+        new Promise<void>((r) => {
+          resolve = r;
+        }),
+    );
+    track.muted = false;
+    track.dispatchEvent(new Event("unmute"));
+    recorder.pause();
+    resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(recorder.state).toBe("paused");
+    await recorder.resume();
+    expect(recorder.state).toBe("recording");
+    recorder.dispose();
+  });
+  it("waits for initially-muted input and pauses if the context closes", async () => {
+    const recorder = createCallRecorder();
+    const track = microphone.getAudioTracks()[0];
+    track.muted = true;
+    await recorder.start();
+    expect(recorder.state).toBe("paused");
+    track.muted = false;
+    track.dispatchEvent(new Event("unmute"));
+    await vi.waitFor(() => expect(recorder.state).toBe("recording"));
+    contexts[0].state = "closed";
+    contexts[0].dispatchEvent(new Event("statechange"));
+    expect(recorder.state).toBe("paused");
+    await expect(recorder.resume()).rejects.toThrow("Finish recording");
+    recorder.dispose();
   });
 });

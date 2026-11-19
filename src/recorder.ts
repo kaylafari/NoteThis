@@ -7,6 +7,7 @@ export interface RecorderOptions {
   onLevels?: (levels: { mic: number; system: number }) => void;
   onStateChange?: (state: RecorderState) => void;
   onError?: (error: Error) => void;
+  onRecovery?: (message: string | null, reconnecting: boolean) => void;
 }
 export interface RecordingSources {
   includeMic?: boolean;
@@ -101,6 +102,24 @@ export function createCallRecorder(options: RecorderOptions = {}) {
   let stopPromise: Promise<RecordingResult> | null = null;
   let recorderError: Error | null = null;
 
+  type Input = {
+    kind: "mic" | "system";
+    stream: MediaStream;
+    nodes?: AudioNode[];
+    remove?: Array<() => void>;
+    analyser?: AnalyserNode;
+    values?: Float32Array<ArrayBuffer>;
+  };
+  let inputs: Input[] = [];
+  let selectedSources: RecordingSources = {};
+  let limiter: DynamicsCompressorNode | null = null;
+  let recovery: Promise<void> | null = null;
+  let autoResume = true;
+  let interrupted = false;
+  let sleeping = false;
+  let lastLiveAt = 0;
+  let resumeIntent = 0;
+
   function setState(next: RecorderState) {
     state = next;
     options.onStateChange?.(next);
@@ -111,9 +130,12 @@ export function createCallRecorder(options: RecorderOptions = {}) {
     meterTimer = undefined;
     for (const remove of listeners) remove();
     listeners = [];
+    inputs.forEach((input) => input.remove?.forEach((remove) => remove()));
     for (const stream of streams)
       for (const track of stream.getTracks()) track.stop();
     streams = [];
+    inputs = [];
+    limiter = null;
     for (const node of nodes) {
       try {
         node.disconnect();
@@ -127,30 +149,258 @@ export function createCallRecorder(options: RecorderOptions = {}) {
     options.onLevels?.({ mic: 0, system: 0 });
   }
 
-  function pause() {
+  function pauseCapture(interruption = false) {
     if (state !== "recording" || !recorder) return;
     if (recorder.state === "recording") recorder.pause();
-    activeDuration += performance.now() - activeStartedAt;
+    // A throttled renderer may first notice sleep after waking. Do not count
+    // the unobserved gap as recorded audio.
+    const now = performance.now();
+    const end = interruption && now - lastLiveAt > 5000 ? lastLiveAt : now;
+    activeDuration += Math.max(0, end - activeStartedAt);
     setState("paused");
     options.onLevels?.({ mic: 0, system: 0 });
   }
-
-  function resume() {
-    if (state !== "paused") return;
-    if (!recorder || recorder.state !== "paused" || recorderError)
-      throw new Error(
-        "Audio capture has stopped. Choose Finish recording to recover captured audio, then start a new recording.",
-      );
-    const ended = streams.some((stream) =>
-      stream.getTracks().some((track) => track.readyState !== "live"),
+  function pause() {
+    resumeIntent++;
+    interrupted = false;
+    pauseCapture();
+    options.onRecovery?.(null, false);
+  }
+  function interrupt(message: string) {
+    if (state !== "recording") return;
+    interrupted = true;
+    pauseCapture(true);
+    options.onRecovery?.(message, false);
+  }
+  const ended = (input: Input) =>
+    input.stream.getTracks().some((track) => track.readyState !== "live");
+  const muted = () =>
+    inputs.some((input) =>
+      input.stream.getAudioTracks().some((track) => track.muted),
     );
-    if (ended)
+  async function requestSource(
+    source: RecordingPermissionSource,
+    request: () => Promise<MediaStream>,
+    run: number,
+  ) {
+    options.onPermissionRequest?.(source);
+    try {
+      const stream = await request(); // Invoked before any await: preserve click activation.
+      if (run !== generation) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error("Recording was cancelled.");
+      }
+      return stream;
+    } catch (error) {
+      if (run !== generation) throw new Error("Recording was cancelled.");
+      throw sourceRequestError(source, error);
+    } finally {
+      if (run === generation) options.onPermissionRequest?.(null);
+    }
+  }
+  function acquire(kind: "mic" | "system", run: number) {
+    return requestSource(
+      kind === "mic" ? "microphone" : "system",
+      () =>
+        kind === "system"
+          ? navigator.mediaDevices.getDisplayMedia({
+              video: { width: 1, height: 1, frameRate: 1 },
+              audio: true,
+            })
+          : navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                ...(selectedSources.microphoneDeviceId
+                  ? { deviceId: { exact: selectedSources.microphoneDeviceId } }
+                  : {}),
+              },
+              video: false,
+            }),
+      run,
+    );
+  }
+  function validateInput(stream: MediaStream, kind: "mic" | "system") {
+    if (
+      !stream.getAudioTracks().length ||
+      stream.getTracks().some((track) => track.readyState !== "live")
+    )
       throw new Error(
-        "An audio source disconnected. Save this recording and start a new one.",
+        kind === "system"
+          ? SYSTEM_AUDIO_ERROR
+          : "No live microphone track was received. Reconnect the microphone and click Resume.",
       );
-    recorder.resume();
-    activeStartedAt = performance.now();
-    setState("recording");
+  }
+  function detach(input: Input) {
+    input.remove?.forEach((remove) => remove());
+    input.nodes?.forEach((node) => {
+      try {
+        node.disconnect();
+      } catch {}
+    });
+    nodes = nodes.filter((node) => !input.nodes?.includes(node));
+    input.stream.getTracks().forEach((track) => track.stop());
+    streams = streams.filter((stream) => stream !== input.stream);
+  }
+  function attach(input: Input) {
+    validateInput(input.stream, input.kind);
+    const source = context!.createMediaStreamSource(
+      new MediaStream(input.stream.getAudioTracks()),
+    );
+    const gain = context!.createGain();
+    gain.gain.value = inputs.length > 1 ? 0.75 : 1;
+    source.connect(gain);
+    gain.connect(limiter!);
+    const analyser = context!.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    input.nodes = [source, gain, analyser];
+    input.analyser = analyser;
+    input.values = new Float32Array(analyser.fftSize);
+    input.remove = [];
+    for (const track of input.stream.getTracks()) {
+      const lost = () =>
+        interrupt(
+          `${input.kind === "system" ? "System audio" : "Microphone"} disconnected. Captured audio is kept. Click Resume to reconnect.`,
+        );
+      const silenced = () =>
+        interrupt(
+          "Audio is temporarily unavailable. Waiting for the source to return; you can also click Resume.",
+        );
+      const restored = () => {
+        void tryAutoResume();
+      };
+      for (const [event, handler] of [
+        ["ended", lost],
+        ["mute", silenced],
+        ["unmute", restored],
+      ] as const) {
+        track.addEventListener(event, handler);
+        input.remove.push(() => track.removeEventListener(event, handler));
+      }
+    }
+    nodes.push(...input.nodes);
+  }
+  async function tryAutoResume() {
+    if (
+      !autoResume ||
+      !interrupted ||
+      sleeping ||
+      recovery ||
+      state !== "paused"
+    )
+      return;
+    // Never open a new screen-sharing picker without a Resume click.
+    if (inputs.some((input) => input.kind === "system" && ended(input))) {
+      options.onRecovery?.(
+        "System audio needs to be shared again. Click Resume to reconnect; earlier audio is kept.",
+        false,
+      );
+      return;
+    }
+    if (muted()) return;
+    try {
+      await resume(true);
+    } catch {
+      /* Manual retry remains available. */
+    }
+  }
+  function resume(automatic = false): Promise<void> {
+    if (recovery) return recovery;
+    if (state !== "paused") return Promise.resolve();
+    const run = generation;
+    const intent = resumeIntent;
+    options.onRecovery?.("Reconnecting audio…", true);
+    const work = async () => {
+      if (
+        !recorder ||
+        recorder.state !== "paused" ||
+        recorderError ||
+        !context ||
+        context.state === "closed"
+      )
+        throw new Error(
+          "Audio capture has stopped. Choose Finish recording to recover captured audio, then start a new recording.",
+        );
+      // Display is first and synchronous to retain the Resume click's activation.
+      for (const input of [...inputs].sort((a, b) =>
+        a.kind === b.kind ? 0 : a.kind === "system" ? -1 : 1,
+      )) {
+        if (
+          !ended(input) &&
+          (automatic ||
+            !input.stream.getAudioTracks().some((track) => track.muted))
+        )
+          continue;
+        const replacement = await acquire(input.kind, run);
+        try {
+          if (run !== generation) throw new Error("Recording was cancelled.");
+          validateInput(replacement, input.kind);
+          detach(input);
+          input.stream = replacement;
+          streams.push(replacement);
+          attach(input);
+        } catch (error) {
+          replacement.getTracks().forEach((track) => track.stop());
+          throw error;
+        }
+      }
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          context.resume(),
+          new Promise<never>((_resolve, reject) => {
+            timeout = setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    "Audio did not wake up yet. Click Resume to try again, or Finish recording to save captured audio.",
+                  ),
+                ),
+              8000,
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (run !== generation) throw new Error("Recording was cancelled.");
+      if (intent !== resumeIntent)
+        throw new Error("Recording remains paused. Click Resume when ready.");
+      if (automatic && !autoResume)
+        throw new Error("Automatic resume is off. Click Resume when ready.");
+      if (
+        sleeping ||
+        context.state !== "running" ||
+        muted() ||
+        inputs.some(ended)
+      )
+        throw new Error(
+          "Audio is still unavailable. Reconnect the selected sources and click Resume again. Captured audio is kept.",
+        );
+      recorder.resume();
+      interrupted = false;
+      activeStartedAt = lastLiveAt = performance.now();
+      setState("recording");
+      options.onRecovery?.(
+        "Recording resumed. Audio captured before the interruption is kept; time asleep is not recorded.",
+        false,
+      );
+    };
+    recovery = work()
+      .catch((error) => {
+        if (run === generation)
+          options.onRecovery?.(
+            `${automatic ? "Automatic reconnection could not finish. " : ""}${(error as Error).message}`,
+            false,
+          );
+        throw error;
+      })
+      .finally(() => {
+        if (run === generation) recovery = null;
+      });
+    return recovery;
   }
 
   async function start(sources: RecordingSources = {}) {
@@ -165,11 +415,16 @@ export function createCallRecorder(options: RecorderOptions = {}) {
         "Recording is not supported here. Open the desktop app or a current browser on localhost.",
       );
     starting = true;
+    selectedSources = { ...sources };
+    interrupted = false;
+    sleeping = false;
+    inputs = [];
+    options.onRecovery?.(null, false);
     const run = ++generation;
     chunks = [];
     activeDuration = 0;
     recorderError = null;
-    const inputs: Array<{ kind: "mic" | "system"; stream: MediaStream }> = [];
+
     // A pending permission prompt can outlive dispose(). Never retain its late stream.
     function retain(stream: MediaStream, kind: "mic" | "system") {
       if (run !== generation) {
@@ -187,54 +442,14 @@ export function createCallRecorder(options: RecorderOptions = {}) {
         );
       }
     }
-    async function requestSource(
-      source: RecordingPermissionSource,
-      request: () => Promise<MediaStream>,
-    ) {
-      options.onPermissionRequest?.(source);
-      try {
-        // Invoke synchronously: display capture must keep the Start click's activation.
-        return await request();
-      } catch (error) {
-        if (run !== generation) throw new Error("Recording was cancelled.");
-        throw sourceRequestError(source, error);
-      } finally {
-        if (run === generation) options.onPermissionRequest?.(null);
-      }
-    }
     try {
       // Request display first, while the Start button's user activation is present.
       if (includeSystem) {
         if (!navigator.mediaDevices.getDisplayMedia)
           throw new Error(SYSTEM_AUDIO_ERROR);
-        retain(
-          await requestSource("system", () =>
-            navigator.mediaDevices.getDisplayMedia({
-              video: { width: 1, height: 1, frameRate: 1 },
-              audio: true,
-            }),
-          ),
-          "system",
-        );
+        retain(await acquire("system", run), "system");
       }
-      if (includeMic) {
-        retain(
-          await requestSource("microphone", () =>
-            navigator.mediaDevices.getUserMedia({
-              audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                ...(sources.microphoneDeviceId
-                  ? { deviceId: { exact: sources.microphoneDeviceId } }
-                  : {}),
-              },
-              video: false,
-            }),
-          ),
-          "mic",
-        );
-      }
+      if (includeMic) retain(await acquire("mic", run), "mic");
       if (run !== generation) throw new Error("Recording was cancelled.");
       context = new AudioContext();
       await context.resume();
@@ -242,56 +457,13 @@ export function createCallRecorder(options: RecorderOptions = {}) {
       const destination = context.createMediaStreamDestination();
       streams.push(destination.stream);
       nodes.push(destination);
-      const limiter = context.createDynamicsCompressor();
+      limiter = context.createDynamicsCompressor();
       limiter.threshold.value = -6;
       limiter.knee.value = 12;
       limiter.ratio.value = 8;
       limiter.connect(destination);
       nodes.push(limiter);
-      const meters: Array<{
-        kind: "mic" | "system";
-        analyser: AnalyserNode;
-        values: Float32Array<ArrayBuffer>;
-      }> = [];
-      for (const input of inputs) {
-        // Ignore the display video: only audio enters the saved recording.
-        const source = context.createMediaStreamSource(
-          new MediaStream(input.stream.getAudioTracks()),
-        );
-        const gain = context.createGain();
-        gain.gain.value = inputs.length > 1 ? 0.75 : 1;
-        source.connect(gain);
-        gain.connect(limiter);
-        const analyser = context.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        meters.push({
-          kind: input.kind,
-          analyser,
-          values: new Float32Array(analyser.fftSize),
-        });
-        nodes.push(source, gain, analyser);
-        // Ending screen sharing is also a source loss, even if the browser
-        // leaves its companion audio track alive briefly.
-        for (const track of input.stream.getTracks()) {
-          if (track.readyState !== "live")
-            throw new Error(
-              input.kind === "system"
-                ? SYSTEM_AUDIO_ERROR
-                : "The microphone disconnected before recording started.",
-            );
-          const ended = () => {
-            pause();
-            options.onError?.(
-              new Error(
-                `${input.kind === "system" ? "System audio sharing" : "The microphone"} ended. The recording has been paused; save it, then start a new recording.`,
-              ),
-            );
-          };
-          track.addEventListener("ended", ended);
-          listeners.push(() => track.removeEventListener("ended", ended));
-        }
-      }
+      inputs.forEach(attach);
       const mimeType = preferredRecordingMimeType();
       recorder = new MediaRecorder(destination.stream, {
         ...(mimeType ? { mimeType } : {}),
@@ -309,21 +481,75 @@ export function createCallRecorder(options: RecorderOptions = {}) {
         options.onError?.(recorderError);
       };
       recorder.start(1000);
-      activeStartedAt = performance.now();
+      activeStartedAt = lastLiveAt = performance.now();
       setState("recording");
+      if (muted())
+        interrupt(
+          "Audio is not available yet. Waiting for the selected sources, or click Resume to reconnect.",
+        );
       meterTimer = setInterval(() => {
         if (state !== "recording") return;
         const levels = { mic: 0, system: 0 };
-        for (const meter of meters) {
-          meter.analyser.getFloatTimeDomainData(meter.values);
-          const rms = Math.sqrt(
-            meter.values.reduce((sum, value) => sum + value * value, 0) /
-              meter.values.length,
+        const now = performance.now();
+        if (now - lastLiveAt > 5000) {
+          interrupt(
+            "Recording paused while the computer was asleep. Reconnecting when audio is available.",
           );
-          levels[meter.kind] = Math.min(1, rms * 4);
+          void tryAutoResume();
+          return;
+        }
+        lastLiveAt = now;
+        for (const input of inputs) {
+          input.analyser!.getFloatTimeDomainData(input.values!);
+          const rms = Math.sqrt(
+            input.values!.reduce((sum, value) => sum + value * value, 0) /
+              input.values!.length,
+          );
+          levels[input.kind] = Math.min(1, rms * 4);
         }
         options.onLevels?.(levels);
       }, 80);
+      const wake = () => {
+        void tryAutoResume();
+      };
+      const contextChanged = () => {
+        if (context?.state === "closed") {
+          interrupt(
+            "The audio engine stopped. Finish recording to save captured audio, then start a new recording.",
+          );
+          return;
+        }
+        if (
+          context?.state === "suspended" ||
+          (context?.state as string) === "interrupted"
+        )
+          interrupt(
+            "Audio paused after a system interruption. It will resume when available, or click Resume.",
+          );
+        else if (context?.state === "running") wake();
+      };
+      const audioContext = context;
+      audioContext.addEventListener("statechange", contextChanged);
+      listeners.push(() =>
+        audioContext.removeEventListener("statechange", contextChanged),
+      );
+      navigator.mediaDevices.addEventListener?.("devicechange", wake);
+      listeners.push(() =>
+        navigator.mediaDevices.removeEventListener?.("devicechange", wake),
+      );
+      if (typeof window !== "undefined") {
+        window.addEventListener?.("focus", wake);
+        listeners.push(() => window.removeEventListener?.("focus", wake));
+        const unsubscribe = window.desktop?.onPowerState?.((event) => {
+          sleeping = event === "suspend";
+          if (sleeping)
+            interrupt(
+              "Computer asleep. Captured audio is kept; recording can resume after wake.",
+            );
+          else wake();
+        });
+        if (unsubscribe) listeners.push(unsubscribe);
+      }
     } catch (error) {
       // Only this generation may clean shared resources; a late rejected prompt
       // must not interrupt a newer recording after dispose().
@@ -343,6 +569,11 @@ export function createCallRecorder(options: RecorderOptions = {}) {
     if (stopPromise) return stopPromise;
     if (starting)
       throw new Error("Wait for the audio permission prompt to finish.");
+    generation++;
+    recovery = null;
+    interrupted = false;
+    options.onRecovery?.(null, false);
+    options.onPermissionRequest?.(null);
     const current = recorder;
     if (!current || state === "idle")
       throw new Error("No recording is active.");
@@ -393,6 +624,10 @@ export function createCallRecorder(options: RecorderOptions = {}) {
 
   function dispose() {
     generation++;
+    recovery = null;
+    interrupted = false;
+    options.onRecovery?.(null, false);
+    options.onPermissionRequest?.(null);
     starting = false;
     if (!stopPromise && recorder) {
       recorder.ondataavailable = null;
@@ -414,6 +649,18 @@ export function createCallRecorder(options: RecorderOptions = {}) {
     resume,
     stop,
     dispose,
+    setAutoResume(enabled: boolean) {
+      autoResume = enabled;
+      if (enabled) void tryAutoResume();
+    },
+    get durationMs() {
+      return (
+        activeDuration +
+        (state === "recording"
+          ? Math.max(0, performance.now() - activeStartedAt)
+          : 0)
+      );
+    },
     get state() {
       return state;
     },

@@ -6,6 +6,9 @@ declare global {
       readonly isElectron: true;
       readonly platform: string;
       readonly appVersion: string;
+      onPowerState?: (
+        callback: (state: "suspend" | "resume") => void,
+      ) => () => void;
       updates?: {
         state: () => Promise<import("../shared/updates").UpdateState>;
         action: (

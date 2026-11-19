@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld(
     isElectron: true,
     platform: process.platform,
     appVersion: version,
+    onPowerState: (callback: (state: "suspend" | "resume") => void) => {
+      const listener = (_event: unknown, state: unknown) => {
+        if (state === "suspend" || state === "resume") callback(state);
+      };
+      ipcRenderer.on("notethis:power-state", listener);
+      return () => ipcRenderer.removeListener("notethis:power-state", listener);
+    },
     updates: Object.freeze({
       state: () => ipcRenderer.invoke("notethis:update-state"),
       action: (action: import("../shared/updates").UpdateAction) =>

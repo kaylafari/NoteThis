@@ -1891,6 +1891,9 @@ export function RecordingModal({
   const [systemQuiet, setSystemQuiet] = useState(false);
   const lastSystemSound = useRef(0);
   const [elapsed, setElapsed] = useState(0);
+  const [autoResume, setAutoResume] = useState(true);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [permissionRequest, setPermissionRequest] = useState<
@@ -1902,6 +1905,7 @@ export function RecordingModal({
     durationMs: number;
   } | null>(null);
   const [discard, setDiscard] = useState(false);
+  const recordingAction = useRef(0);
   const recorder = useRef<ReturnType<typeof createCallRecorder> | null>(null);
   useEffect(() => {
     recorder.current = createCallRecorder({
@@ -1912,11 +1916,19 @@ export function RecordingModal({
           setSystemQuiet(false);
         }
       },
-      onStateChange: setState,
+      onStateChange: (next) => {
+        setState(next);
+        if (next === "recording") setError("");
+      },
+      onRecovery: (message, pending) => {
+        setRecoveryMessage(message);
+        setReconnecting(pending);
+      },
       onPermissionRequest: setPermissionRequest,
       onError: (e) => setError(e.message),
     });
     return () => {
+      recordingAction.current++;
       recorder.current?.dispose();
     };
   }, []);
@@ -1925,7 +1937,7 @@ export function RecordingModal({
     if (state !== "recording") return;
     lastSystemSound.current = performance.now();
     const timer = setInterval(() => {
-      setElapsed((old) => old + 1);
+      setElapsed((recorder.current?.durationMs ?? 0) / 1000);
       if (system && performance.now() - lastSystemSound.current >= 10_000)
         setSystemQuiet(true);
     }, 1000);
@@ -1958,6 +1970,7 @@ export function RecordingModal({
     }
   }
   async function stop() {
+    recordingAction.current++;
     setStarting(true);
     setError("");
     try {
@@ -1977,7 +1990,11 @@ export function RecordingModal({
           ? "Your recording is ready"
           : state === "idle"
             ? "Record a meeting"
-            : "You’re recording."
+            : reconnecting
+              ? "Reconnecting audio"
+              : state === "paused"
+                ? "Recording paused"
+                : "You’re recording."
       }
       subtitle={
         captured
@@ -2130,7 +2147,8 @@ export function RecordingModal({
                   <p>
                     Your audio stays in memory until you save.
                     <br />
-                    Keep this window open while recording.
+                    Keep this window open. Audio during sleep cannot be
+                    captured.
                   </p>
                 )}
               </div>
@@ -2143,6 +2161,25 @@ export function RecordingModal({
                   check audio sharing and macOS permissions. Recording continues
                   normally.
                 </span>
+              </div>
+            )}
+            {!captured && (
+              <label className="recording-auto-resume">
+                <input
+                  type="checkbox"
+                  checked={autoResume}
+                  onChange={(event) => {
+                    setAutoResume(event.target.checked);
+                    recorder.current?.setAutoResume(event.target.checked);
+                  }}
+                />
+                Automatically resume after an audio interruption
+              </label>
+            )}
+            {recoveryMessage && !captured && (
+              <div className="info-note" role="status">
+                {reconnecting && <Spinner />}
+                <span>{recoveryMessage}</span>
               </div>
             )}
             {permissionRequest && (
@@ -2207,14 +2244,17 @@ export function RecordingModal({
                 <>
                   <button
                     className="button secondary"
-                    disabled={starting}
-                    onClick={() => {
+                    disabled={starting || reconnecting}
+                    onClick={async () => {
+                      const action = ++recordingAction.current;
                       try {
-                        if (state === "paused") recorder.current?.resume();
+                        if (state === "paused")
+                          await recorder.current?.resume();
                         else recorder.current?.pause();
-                        setError("");
+                        if (action === recordingAction.current) setError("");
                       } catch (error) {
-                        setError((error as Error).message);
+                        if (action === recordingAction.current)
+                          setError((error as Error).message);
                       }
                     }}
                   >

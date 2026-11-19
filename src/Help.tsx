@@ -349,6 +349,22 @@ export function HelpContent({
           captured.
         </p>
       </section>
+      <section className="help-note">
+        <h3>Resume after sleep or a disconnected device</h3>
+        <p>
+          NoteThis keeps captured audio and pauses when a source is interrupted.
+          Click <strong>Resume</strong> to reconnect. Automatic resume is on by
+          default in the recording dialog; turn it off there if you prefer. A
+          deliberate Pause stays paused. System audio may require another
+          sharing approval after wake, so click Resume when prompted.
+        </p>
+        <p>
+          Audio during sleep cannot be captured. Keep the recording window open
+          until you save. If the audio engine has stopped permanently, choose
+          <strong> Finish recording</strong> to save captured audio, then start
+          a new recording.
+        </p>
+      </section>
       <LocalPreparation onReady={onLocalReady} />
       <p className="help-footnote">
         You can return to this guide anytime in Settings → Help & tips. Larger

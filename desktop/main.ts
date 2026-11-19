@@ -5,6 +5,7 @@ import {
   desktopCapturer,
   dialog,
   Menu,
+  powerMonitor,
   ipcMain,
   safeStorage,
   session,
@@ -273,11 +274,24 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: true,
+      backgroundThrottling: false,
     },
   });
   const win = mainWindow;
+  const suspended = () => {
+    if (!win.isDestroyed() && isLocalApp(win.webContents.getURL()))
+      win.webContents.send("notethis:power-state", "suspend");
+  };
+  const resumed = () => {
+    if (!win.isDestroyed() && isLocalApp(win.webContents.getURL()))
+      win.webContents.send("notethis:power-state", "resume");
+  };
+  powerMonitor.on("suspend", suspended);
+  powerMonitor.on("resume", resumed);
   win.once("ready-to-show", () => win.show());
   win.on("closed", () => {
+    powerMonitor.removeListener("suspend", suspended);
+    powerMonitor.removeListener("resume", resumed);
     if (mainWindow === win) mainWindow = null;
   });
   win.webContents.setWindowOpenHandler(({ url }) => {

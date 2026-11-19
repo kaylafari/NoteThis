@@ -41,6 +41,17 @@
   font-size: var(--text-small);
   line-height: 1.6;
 }
+.recording-auto-resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+.recording-auto-resume input {
+  accent-color: var(--accent);
+}
 .recording-model-check p + p {
   margin-top: 8px;
 }

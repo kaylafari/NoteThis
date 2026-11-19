@@ -33,7 +33,7 @@ test("recording permissions stay pending until their source succeeds or rejects"
             export function createCallRecorder(options) {
               let resolve, reject;
               const control = {
-                options, starts: [], disposed: 0, stopped: 0, pauses: 0, resumes: 0,
+                options, starts: [], disposed: 0, stopped: 0, pauses: 0, resumes: 0, autoResume: true,
                 permission: source => options.onPermissionRequest?.(source),
                 succeed: () => { options.onPermissionRequest?.(null); options.onStateChange?.('recording'); resolve(); },
                 deny: message => { options.onPermissionRequest?.(null); reject(new Error(message)); },
@@ -42,7 +42,9 @@ test("recording permissions stay pending until their source succeeds or rejects"
               return {
                 start(sources) { control.starts.push(sources); return new Promise((yes, no) => { resolve=yes; reject=no; options.onPermissionRequest?.(sources.includeMic ? 'microphone' : 'system'); }); },
                 pause() { control.pauses++; options.onStateChange?.('paused'); },
-                resume() { control.resumes++; options.onStateChange?.('recording'); },
+                resume() { control.resumes++; if (window.deferResume) { options.onRecovery?.('Reconnecting audio…', true); return new Promise((resolve, reject) => { control.failed = reject; control.reconnected = () => { options.onStateChange?.('recording'); options.onRecovery?.('Recording resumed.', false); resolve(); }; }); } options.onStateChange?.('recording'); },
+                setAutoResume(enabled) { control.autoResume=enabled; },
+                get durationMs() { return 2200; },
                 async stop() { control.stopped++; options.onStateChange?.('idle'); return { blob: new Blob(['synthetic-audio'], {type:'audio/webm'}), mimeType:'audio/webm', durationMs:2200 }; },
                 dispose() { control.disposed++; },
               };
@@ -389,6 +391,55 @@ test("recording permissions stay pending until their source succeeds or rejects"
       await check(
         () => !status().includes("Requesting"),
         "System rejection clears pending permission status",
+      );
+      await mount();
+      const autoToggle = document.querySelector(
+        ".recording-auto-resume input",
+      ) as HTMLInputElement;
+      autoToggle.click();
+      await check(
+        () => w.syntheticRecorder.autoResume === false,
+        "Auto-resume can be disabled",
+      );
+      await click("Start recording");
+      w.syntheticRecorder.succeed();
+      await check(
+        () => text().includes("RECORDING LIVE"),
+        "Recording starts for recovery check",
+      );
+      await click("Pause");
+      w.deferResume = true;
+      await click("Resume");
+      await check(
+        () =>
+          button("Resume").disabled &&
+          !button("Finish recording").disabled &&
+          text().includes("Reconnecting audio"),
+        "Reconnection prevents duplicate Resume and leaves Finish available",
+      );
+      w.syntheticRecorder.reconnected();
+      await check(
+        () =>
+          text().includes("RECORDING LIVE") &&
+          text().includes("Recording resumed."),
+        "Async reconnection returns to live recording",
+      );
+      await click("Pause");
+      await click("Resume");
+      await check(
+        () => text().includes("Reconnecting audio"),
+        "Second recovery is pending",
+      );
+      await click("Finish recording");
+      await check(
+        () => text().includes("CAPTURE COMPLETE"),
+        "Finish saves capture while a reconnect is pending",
+      );
+      w.syntheticRecorder.failed(new Error("Recording was cancelled."));
+      await wait();
+      await check(
+        () => !document.querySelector('[role="alert"]'),
+        "Late reconnect cancellation does not mark recovered audio as failed",
       );
       w.unmountRecording();
       return { passed };
