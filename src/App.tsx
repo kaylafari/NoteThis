@@ -14,11 +14,11 @@ import {
   ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   AudioLines,
   Check,
   CheckCheck,
   ChevronDown,
-  ChevronRight,
   Circle,
   Clock3,
   ExternalLink,
@@ -34,7 +34,6 @@ import {
   MoreHorizontal,
   Pause,
   Play,
-  Plus,
   Search,
   Send,
   Settings2,
@@ -552,14 +551,9 @@ export default function App() {
           </span>
           <span>NoteThis</span>
         </a>
-        <div className="workspace-label">
-          YOUR WORKSPACE{" "}
-          <span className="local-badge">
-            <span /> Local
-          </span>
-        </div>
         <button
-          className="sidebar-nav active"
+          className={`sidebar-nav ${!selected ? "active" : ""}`}
+          aria-label="All meetings"
           onClick={() => {
             setSearch("");
             setSelected(null);
@@ -577,7 +571,7 @@ export default function App() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="list-label">RECENT MEETINGS</div>
+        <div className="list-label">Recent</div>
         <nav className="meeting-list" aria-label="Meetings">
           {loading ? (
             <div className="sidebar-empty">
@@ -588,6 +582,8 @@ export default function App() {
               <button
                 key={item.id}
                 className={`meeting-card ${selected === item.id ? "selected" : ""}`}
+                aria-current={selected === item.id ? "page" : undefined}
+                aria-label={item.title}
                 onClick={() => setSelected(item.id)}
               >
                 <span className="meeting-card-icon">
@@ -605,7 +601,6 @@ export default function App() {
                         : "Audio recording"}
                   </small>
                 </span>
-                {selected === item.id && <span className="selected-dot" />}
               </button>
             ))
           ) : (
@@ -616,35 +611,18 @@ export default function App() {
             </div>
           )}
         </nav>
-        <button
-          className="sidebar-add"
-          onClick={() => upload.current?.click()}
-          disabled={!!working}
-        >
-          <Plus size={17} /> Import a conversation
-        </button>
         <div className="sidebar-bottom">
-          <div className="privacy-note">
-            <ShieldCheck size={19} />
-            <div>
-              <strong>Your space. Your words.</strong>
-              <p>
-                Stored on this device.
-                <br />
-                You choose your AI providers.
-              </p>
-            </div>
-          </div>
           <button
             className="settings-nav"
+            aria-label="Settings"
             onClick={() => setShowSettings(true)}
           >
             <span className="avatar" aria-hidden="true">
               <UserRound size={18} strokeWidth={1.7} />
             </span>
             <span>
-              <strong>Personal workspace</strong>
-              <small>Settings & AI models</small>
+              <strong>Settings</strong>
+              <small>AI models & preferences</small>
             </span>
             <Settings2 size={17} />
           </button>
@@ -654,13 +632,9 @@ export default function App() {
       <main className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
-            Workspace <ChevronRight size={14} />
             <span>{meeting ? "Meeting details" : "All meetings"}</span>
           </div>
           <div className="topbar-actions">
-            <span className="private-pill">
-              <ShieldCheck size={13} /> Local storage
-            </span>
             <button
               className="button secondary"
               onClick={() => upload.current?.click()}
@@ -674,7 +648,7 @@ export default function App() {
               onClick={() => setShowRecord(true)}
               disabled={!!working}
             >
-              <span className="record-dot" />
+              <Mic size={16} />
               <span>Record meeting</span>
             </button>
           </div>
@@ -713,18 +687,6 @@ export default function App() {
         {meeting ? (
           <>
             <section className="meeting-heading">
-              <div className="eyebrow">
-                <span
-                  className={`status-dot ${isBusy(meeting) ? "pulsing" : ""}`}
-                />
-                {isBusy(meeting)
-                  ? meeting.status === "transcribing"
-                    ? "TRANSCRIBING"
-                    : "CREATING NOTES"
-                  : meeting.segments.length
-                    ? "MEETING CAPTURED"
-                    : "AUDIO IMPORTED"}
-              </div>
               <div className="title-row">
                 {editingTitle ? (
                   <form
@@ -899,12 +861,10 @@ export default function App() {
                       {meeting.insight ? (
                         <>
                           <div className="notes-heading">
-                            <span className="section-eyebrow">
-                              THE BIG PICTURE
-                            </span>
+                            <h2>Summary</h2>
                             <button
                               className="inline-link"
-                              disabled={isBusy(meeting)}
+                              disabled={isBusy(meeting) || !!working}
                               onClick={() =>
                                 void run("Refreshing notes", async () =>
                                   updateMeeting(
@@ -916,7 +876,6 @@ export default function App() {
                               Regenerate <Sparkles size={12} />
                             </button>
                           </div>
-                          <h2>Summary</h2>
                           {meeting.insight.summaryFormat === "latex" ? (
                             <LatexSummary source={meeting.insight.summary} />
                           ) : (
@@ -938,27 +897,26 @@ export default function App() {
                               </details>
                             )}
                           </div>
-                          <div className="section-divider" />
-                          <div className="section-label">
-                            <span className="small-icon">
-                              <CheckCheck size={18} />
-                            </span>
-                            <h3>Key decisions</h3>
-                            <span>{meeting.insight.decisions.length}</span>
-                          </div>
-                          {meeting.insight.decisions.length ? (
-                            <ul className="decision-list">
-                              {meeting.insight.decisions.map((decision, i) => (
-                                <li key={i}>
-                                  <span>{String(i + 1).padStart(2, "0")}</span>
-                                  <p>{decision}</p>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="muted">
-                              No explicit decisions were identified.
-                            </p>
+                          {!!meeting.insight.decisions.length && (
+                            <>
+                              <div className="section-divider" />
+                              <div className="section-label">
+                                <CheckCheck size={18} aria-hidden="true" />
+                                <h3>Key decisions</h3>
+                              </div>
+                              <ul className="decision-list">
+                                {meeting.insight.decisions.map(
+                                  (decision, i) => (
+                                    <li key={i}>
+                                      <span>
+                                        {String(i + 1).padStart(2, "0")}
+                                      </span>
+                                      <p>{decision}</p>
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </>
                           )}
                           <MeetingVisuals insight={meeting.insight} />
                           <div className="summary-footer">
@@ -1299,49 +1257,30 @@ export default function App() {
             </footer>
           </>
         ) : loading || selected ? (
-          <div className="loading-main">
+          <div className="loading-main" role="status" aria-live="polite">
             <Spinner />
             <span>Opening your workspace…</span>
           </div>
         ) : (
           <div className="welcome">
             <div className="welcome-heading">
-              <span className="eyebrow">
-                A LITTLE MORE PRESENT. A LOT LESS NOTE-TAKING.
-              </span>
-              <h1>
-                Be in the conversation.
-                <br />
-                <em>We’ll keep the details.</em>
-              </h1>
+              <h1>Turn conversations into clear notes.</h1>
               <p>
-                Record, revisit, and make sense of your meetings.
-                <br />
-                Every word, next step, and good idea—in one quiet place.
+                Record or import audio. Get a summary, detailed notes, and a
+                transcript you can listen along with.
               </p>
             </div>
             <div className="welcome-cards">
               <button
                 className="welcome-record"
                 onClick={() => setShowRecord(true)}
+                disabled={!!working}
               >
                 <span className="welcome-card-icon">
                   <Mic size={27} />
                 </span>
-                <div className="wave-illustration" aria-hidden="true">
-                  {[
-                    14, 25, 40, 20, 55, 32, 66, 42, 27, 51, 68, 34, 48, 23, 43,
-                    57, 31, 20, 40, 24, 13,
-                  ].map((height, i) => (
-                    <i key={i} style={{ height }} />
-                  ))}
-                </div>
-                <h2>Capture the conversation</h2>
-                <p>
-                  Record your microphone and system audio.
-                  <br />
-                  Stay focused on the people in the room.
-                </p>
+                <h2>Record a meeting</h2>
+                <p>Capture your microphone and system audio together.</p>
                 <span className="card-link">
                   Start a recording <ArrowRight size={17} />
                 </span>
@@ -1354,16 +1293,8 @@ export default function App() {
                 <span className="welcome-card-icon">
                   <Upload size={26} />
                 </span>
-                <div className="file-illustration" aria-hidden="true">
-                  <FileAudio size={42} strokeWidth={1.2} />
-                  <span>DROP YOUR AUDIO HERE</span>
-                </div>
-                <h2>Bring a meeting with you</h2>
-                <p>
-                  Upload an existing recording and turn it
-                  <br />
-                  into a transcript, notes, and next steps.
-                </p>
+                <h2>Import a recording</h2>
+                <p>Turn a saved meeting, lecture, or interview into notes.</p>
                 <span className="card-link">
                   Choose an audio file <ArrowRight size={17} />
                 </span>
@@ -1376,6 +1307,7 @@ export default function App() {
               </span>
               <button
                 className="inline-link"
+                disabled={!!working}
                 onClick={() =>
                   void run("Opening sample meeting", async () => {
                     const item = await api.demo();
@@ -1398,7 +1330,7 @@ export default function App() {
                 <Settings2 size={18} />
               </span>
               <div>
-                <strong>Make yourself at home</strong>
+                <strong>Set up your AI models</strong>
                 <span>
                   Choose your AI models and check local services before your
                   first recording.
@@ -1756,7 +1688,7 @@ export function ChatPanel({
         </span>
         <div>
           <h2>Ask this meeting</h2>
-          <p>A little clarity, on demand.</p>
+          <p>Find answers in the transcript.</p>
         </div>
       </header>
       <div className="chat-scroll">
@@ -1832,15 +1764,7 @@ export function ChatPanel({
           ))
         ) : (
           <div className="chat-intro">
-            <span className="chat-orbit">
-              <Sparkles size={25} />
-            </span>
-            <h3>
-              There’s more in
-              <br />
-              the conversation.
-            </h3>
-            <p>Find a detail, untangle an idea, or ask what happens next.</p>
+            <p>Ask about a detail or start with a question below.</p>
             <div className="suggestion-list">
               {[
                 "What are the key takeaways?",
@@ -1853,7 +1777,7 @@ export function ChatPanel({
                   onClick={() => void send(suggestion)}
                 >
                   {suggestion}
-                  <ArrowUpRight />
+                  <ArrowUpRight size={16} aria-hidden="true" />
                 </button>
               ))}
             </div>
@@ -1939,10 +1863,6 @@ export function ChatPanel({
     </aside>
   );
 }
-function ArrowUpRight() {
-  return <ArrowRight size={14} className="suggestion-arrow" />;
-}
-
 export function RecordingModal({
   onClose,
   onSave,
@@ -2046,13 +1966,13 @@ export function RecordingModal({
         captured
           ? "Your recording is ready"
           : state === "idle"
-            ? "Make room for the conversation."
+            ? "Record a meeting"
             : "You’re recording."
       }
       subtitle={
         captured
           ? "Save your audio and create a transcript."
-          : "Capture the words. Stay in the moment."
+          : "Choose which audio to capture, then start recording."
       }
       onClose={close}
     >
@@ -3081,8 +3001,8 @@ export function SettingsModal({
   ];
   return (
     <Modal
-      title="A workspace that sounds like you."
-      subtitle="Choose where your audio and words are processed."
+      title="Settings"
+      subtitle="Manage your AI models, local setup, and app preferences."
       onClose={() => void closeSettings()}
       wide
     >
@@ -3257,7 +3177,7 @@ export function SettingsModal({
                   <div>
                     <h3>Meeting intelligence</h3>
                     <p>
-                      For summaries, action items, and your meeting assistant.
+                      For summaries, detailed notes, and your meeting assistant.
                     </p>
                   </div>
                 </div>

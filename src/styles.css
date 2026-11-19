@@ -8,7 +8,23 @@
   font-weight: 400;
   font-size: 14px;
   --ink: #262626;
-  --muted: #707074;
+  --muted: #606065;
+  --surface: #ffffff;
+  --surface-subtle: #f5f5f7;
+  --accent-soft: #f3edf9;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --text-small: 12px;
+  --text-ui: 13px;
+  --text-body: 14px;
+  --motion-feedback: 160ms;
   --accent: #6f2da8;
   --accent-hover: #592287;
   --pale: #f2eee8;
@@ -54,13 +70,13 @@ a {
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid #8d7960;
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
 input:focus,
 textarea:focus,
 select:focus {
-  outline: 2px solid #8d7960;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 a {
@@ -200,7 +216,7 @@ textarea::placeholder {
   border-radius: 7px;
   width: 100%;
   font-weight: 550;
-  font-size: 12px;
+  font-size: var(--text-ui);
 }
 .sidebar-nav.active {
   background: #eae5de;
@@ -227,7 +243,7 @@ textarea::placeholder {
   min-width: 0;
   width: 100%;
   border: 0;
-  font-size: 11px;
+  font-size: var(--text-small);
   outline: none;
 }
 .list-label {
@@ -272,7 +288,7 @@ textarea::placeholder {
   min-width: 0;
 }
 .meeting-card strong {
-  font-size: 11px;
+  font-size: var(--text-small);
   font-weight: 600;
   line-height: 1.6;
   display: block;
@@ -284,7 +300,7 @@ textarea::placeholder {
 .meeting-card small {
   display: flex;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #606065;
   margin-top: 5px;
   white-space: nowrap;
@@ -303,7 +319,7 @@ textarea::placeholder {
 }
 .sidebar-empty {
   padding: 18px 12px;
-  font-size: 11px;
+  font-size: var(--text-small);
   color: #606065;
   line-height: 1.8;
   display: flex;
@@ -380,11 +396,11 @@ textarea::placeholder {
   flex: 1;
 }
 .settings-nav strong {
-  font-size: 10px;
+  font-size: var(--text-ui);
   font-weight: 600;
 }
 .settings-nav small {
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #606065;
 }
 .settings-nav > svg {
@@ -412,7 +428,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 13px;
-  font-size: 10px;
+  font-size: var(--text-small);
   color: #606065;
 }
 .breadcrumb span {
@@ -439,7 +455,7 @@ textarea::placeholder {
   gap: 8px;
   border-radius: 6px;
   padding: 10px 14px;
-  font-size: 11px;
+  font-size: var(--text-ui);
   line-height: 18px;
   font-weight: 550;
   white-space: nowrap;
@@ -561,7 +577,7 @@ textarea::placeholder {
   align-items: center;
   gap: 13px;
   color: #606065;
-  font-size: 10px;
+  font-size: var(--text-small);
   margin-top: 14px;
 }
 .meeting-meta > span {
@@ -604,7 +620,7 @@ textarea::placeholder {
   white-space: nowrap;
 }
 .tabs > button {
-  font-size: 11px;
+  font-size: var(--text-ui);
   color: #606065;
   display: flex;
   align-items: center;
@@ -658,7 +674,7 @@ textarea::placeholder {
 .transcript-search input {
   border: 0;
   background: none;
-  font-size: 10px;
+  font-size: var(--text-small);
   width: 135px;
   outline: none;
 }
@@ -671,7 +687,7 @@ textarea::placeholder {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #606065;
   padding: 0;
   white-space: nowrap;
@@ -725,11 +741,11 @@ textarea::placeholder {
   transition: background 0.18s;
 }
 .transcript-segment.current {
-  background: #f6f2ed;
-  border-color: #e7dfd3;
+  background: var(--surface-subtle);
+  border-color: var(--line);
 }
 .segment-time {
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #707074;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -747,7 +763,7 @@ textarea::placeholder {
   position: absolute;
   width: 3px;
   height: 16px;
-  background: #b5b5ba;
+  background: var(--accent);
   left: -5px;
   top: 6px;
   border-radius: 2px;
@@ -784,7 +800,7 @@ textarea::placeholder {
 }
 .segment-body p {
   line-height: 2;
-  font-size: 12px;
+  font-size: var(--text-body);
   color: #454549;
   white-space: pre-wrap;
 }
@@ -866,12 +882,12 @@ textarea::placeholder {
   color: #606065;
 }
 .chat-header h2 {
-  font-size: 12px;
+  font-size: var(--text-ui);
   font-weight: 600;
   letter-spacing: -0.2px;
 }
 .chat-header p {
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #707074;
   margin-top: 4px;
 }
@@ -919,7 +935,7 @@ textarea::placeholder {
   color: #454549;
 }
 .chat-intro > p {
-  font-size: 10px;
+  font-size: var(--text-small);
   line-height: 1.9;
   color: #707074;
   max-width: 202px;
@@ -938,7 +954,7 @@ textarea::placeholder {
   padding: 11px 10px;
   border: 1px solid #e3e3e6;
   background: #ffffff;
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #606065;
   border-radius: 6px;
   text-align: left;
@@ -957,7 +973,7 @@ textarea::placeholder {
   gap: 6px;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: var(--text-small);
   color: #707074;
   margin-top: 18px;
   max-width: none;
@@ -980,7 +996,7 @@ textarea::placeholder {
   border: 0;
   outline: none;
   min-height: 42px;
-  font-size: 10px;
+  font-size: var(--text-ui);
   line-height: 1.8;
 }
 .chat-compose textarea::placeholder {
@@ -993,7 +1009,7 @@ textarea::placeholder {
   margin-top: 5px;
 }
 .compose-bottom > span {
-  font-size: 8px;
+  font-size: var(--text-small);
   color: #707074;
   display: flex;
   align-items: center;
@@ -1015,7 +1031,7 @@ textarea::placeholder {
   justify-content: center;
   gap: 5px;
   color: #707074;
-  font-size: 8px;
+  font-size: var(--text-small);
   margin: 10px auto 0;
   max-width: 100%;
   overflow: hidden;
@@ -1135,12 +1151,12 @@ textarea::placeholder {
   flex: 0 0 155px;
 }
 .audio-label strong {
-  font-size: 10px;
+  font-size: var(--text-small);
   font-weight: 600;
   color: #606065;
 }
 .audio-label span {
-  font-size: 8px;
+  font-size: var(--text-small);
   color: #707074;
 }
 .playback-buttons {
@@ -1179,7 +1195,7 @@ textarea::placeholder {
   width: 15px;
 }
 .player-time {
-  font-size: 9px;
+  font-size: var(--text-small);
   min-width: 29px;
   color: #606065;
   font-variant-numeric: tabular-nums;
@@ -1263,7 +1279,7 @@ textarea::placeholder {
   justify-content: space-between;
 }
 .notes-heading .inline-link {
-  font-size: 9px;
+  font-size: var(--text-small);
 }
 .notes-scroll h2 {
   font-family: var(--font);
@@ -1274,7 +1290,7 @@ textarea::placeholder {
   margin: 11px 0 18px;
 }
 .summary-copy {
-  font-size: 12px;
+  font-size: var(--text-body);
   line-height: 2;
   color: #606065;
   white-space: pre-wrap;
@@ -1326,7 +1342,7 @@ textarea::placeholder {
   line-height: 2.1;
 }
 .decision-list p {
-  font-size: 11px;
+  font-size: var(--text-body);
   line-height: 1.9;
   color: #606065;
 }
@@ -1463,7 +1479,7 @@ textarea::placeholder {
   color: #606065;
 }
 .content-empty p {
-  font-size: 11px;
+  font-size: var(--text-ui);
   line-height: 1.9;
   color: #707074;
   white-space: pre-line;
@@ -1546,11 +1562,11 @@ textarea::placeholder {
   flex: 1;
 }
 .processing-card strong {
-  font-size: 10px;
+  font-size: var(--text-ui);
   font-weight: 550;
 }
 .processing-card p {
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #707074;
   line-height: 1.7;
   margin-top: 4px;
@@ -1595,7 +1611,7 @@ textarea::placeholder {
   color: #8b7964;
 }
 .welcome-heading p {
-  font-size: 12px;
+  font-size: var(--text-body);
   line-height: 1.9;
   color: #707074;
   margin-top: 18px;
@@ -1650,7 +1666,7 @@ textarea::placeholder {
   margin-bottom: 10px;
 }
 .welcome-cards p {
-  font-size: 10px;
+  font-size: var(--text-ui);
   line-height: 1.9;
   color: #707074;
 }
@@ -1662,7 +1678,7 @@ textarea::placeholder {
   padding-top: 17px;
   border-top: 1px solid #e3e3e6;
   color: #665440;
-  font-size: 10px;
+  font-size: var(--text-ui);
 }
 .wave-illustration {
   display: flex;
@@ -1700,7 +1716,7 @@ textarea::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 15px;
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #707074;
   max-width: 860px;
   margin-top: 20px;
@@ -1888,7 +1904,7 @@ textarea::placeholder {
   line-height: 1.3;
 }
 .modal-header p {
-  font-size: 10px;
+  font-size: var(--text-ui);
   color: #707074;
   line-height: 1.8;
   margin-top: 8px;
@@ -1914,7 +1930,7 @@ textarea::placeholder {
 .field {
   display: flex;
   flex-direction: column;
-  font-size: 10px;
+  font-size: var(--text-small);
   color: #606065;
   gap: 8px;
   margin-bottom: 18px;
@@ -1927,7 +1943,7 @@ textarea::placeholder {
   border-radius: 6px;
   background: #ffffff;
   padding: 10px 11px;
-  font-size: 11px;
+  font-size: var(--text-ui);
   min-height: 37px;
   color: #606065;
   width: 100%;
@@ -2171,7 +2187,7 @@ textarea::placeholder {
   color: #606065;
 }
 .settings-section-title p {
-  font-size: 9px;
+  font-size: var(--text-small);
   color: #707074;
   margin-top: 5px;
   line-height: 1.7;
@@ -2191,7 +2207,7 @@ textarea::placeholder {
   margin-bottom: 5px;
 }
 .provider-description {
-  font-size: 9px;
+  font-size: var(--text-small);
   line-height: 1.8;
   color: #707074;
   margin: 6px 0 15px;
@@ -2479,7 +2495,7 @@ textarea::placeholder {
     padding-right: 35px;
   }
   .segment-body p {
-    font-size: 14px;
+    font-size: var(--text-body);
   }
   .transcript-segment {
     padding-top: 18px;
@@ -2492,20 +2508,20 @@ textarea::placeholder {
     font-size: 28px;
   }
   .chat-intro > p {
-    font-size: 11px;
+    font-size: var(--text-small);
   }
   .chat-header h2 {
-    font-size: 14px;
+    font-size: var(--text-ui);
   }
   .suggestion-list button {
-    font-size: 11px;
+    font-size: var(--text-small);
     padding: 14px;
   }
   .chat-compose textarea {
-    font-size: 11px;
+    font-size: var(--text-ui);
   }
   .summary-copy {
-    font-size: 14px;
+    font-size: var(--text-body);
   }
   .chat-message {
     font-size: 12px;
@@ -2527,7 +2543,7 @@ textarea::placeholder {
     font-size: 28px;
   }
   .welcome-cards p {
-    font-size: 12px;
+    font-size: var(--text-ui);
   }
   .welcome-card-icon {
     margin-bottom: 60px;
@@ -2537,7 +2553,7 @@ textarea::placeholder {
     top: 45px;
   }
   .welcome-bottom {
-    font-size: 10px;
+    font-size: var(--text-small);
   }
   .welcome-bottom .inline-link {
     font-size: 10px;
@@ -2568,7 +2584,7 @@ textarea::placeholder {
     max-width: 120px;
   }
   .meeting-card small {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .meeting-heading {
     padding: 26px 25px 22px;
@@ -2593,7 +2609,7 @@ textarea::placeholder {
     gap: 14px;
   }
   .tabs > button {
-    font-size: 10px;
+    font-size: var(--text-ui);
     gap: 5px;
   }
   .tabs > button svg {
@@ -2606,7 +2622,7 @@ textarea::placeholder {
     font-size: 24px;
   }
   .meeting-meta {
-    font-size: 9px;
+    font-size: var(--text-small);
     gap: 9px;
   }
   .heading-actions {
@@ -2626,10 +2642,10 @@ textarea::placeholder {
     flex-basis: 135px;
   }
   .audio-label strong {
-    font-size: 9px;
+    font-size: var(--text-small);
   }
   .audio-label span {
-    font-size: 7px;
+    font-size: var(--text-small);
   }
   .audio-file-icon {
     width: 33px;
@@ -2673,13 +2689,13 @@ textarea::placeholder {
     font-size: 40px;
   }
   .segment-body p {
-    font-size: 11px;
+    font-size: var(--text-body);
   }
   .transcript-segment {
     gap: 9px;
   }
   .follow-button {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .transcript-search input {
     width: 105px;
@@ -2703,10 +2719,10 @@ textarea::placeholder {
     font-size: 23px;
   }
   .chat-intro > p {
-    font-size: 9px;
+    font-size: var(--text-small);
   }
   .suggestion-list button {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .meeting-content {
     padding-right: 15px;
@@ -2723,7 +2739,7 @@ textarea::placeholder {
     gap: 12px;
   }
   .tabs > button {
-    font-size: 9px;
+    font-size: var(--text-ui);
   }
   .tabs > button svg {
     display: none;
@@ -2736,7 +2752,7 @@ textarea::placeholder {
   }
   .meeting-meta {
     flex-wrap: wrap;
-    font-size: 8px;
+    font-size: var(--text-small);
     gap: 7px;
   }
   .audio-label {
@@ -2746,21 +2762,21 @@ textarea::placeholder {
     padding: 0 20px;
   }
   .breadcrumb {
-    font-size: 9px;
+    font-size: var(--text-small);
     gap: 6px;
   }
   .topbar-actions {
     gap: 7px;
   }
   .topbar .button {
-    font-size: 10px;
+    font-size: var(--text-small);
     padding: 8px 11px;
   }
   .chat-header h2 {
-    font-size: 11px;
+    font-size: var(--text-ui);
   }
   .chat-header p {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .chat-header {
     gap: 7px;
@@ -2771,7 +2787,7 @@ textarea::placeholder {
   }
   .transcript-search input {
     width: 86px;
-    font-size: 9px;
+    font-size: var(--text-small);
   }
   .follow-button {
     gap: 4px;
@@ -2783,7 +2799,7 @@ textarea::placeholder {
     font-size: 20px;
   }
   .welcome-cards p {
-    font-size: 9px;
+    font-size: var(--text-ui);
   }
   .file-illustration {
     right: 19px;
@@ -2821,7 +2837,7 @@ textarea::placeholder {
     letter-spacing: 1.2px;
   }
   .sidebar-nav {
-    font-size: 11px;
+    font-size: var(--text-ui);
     padding: 11px 8px;
     gap: 8px;
   }
@@ -2835,14 +2851,14 @@ textarea::placeholder {
   }
   .meeting-card strong {
     max-width: 108px;
-    font-size: 10px;
+    font-size: var(--text-small);
   }
   .meeting-card.selected strong {
     max-width: 101px;
   }
   .meeting-card small {
     gap: 4px;
-    font-size: 7px;
+    font-size: var(--text-small);
   }
   .meeting-card-icon svg {
     width: 14px;
@@ -2851,7 +2867,7 @@ textarea::placeholder {
     padding: 10px 8px;
   }
   .sidebar-search input {
-    font-size: 10px;
+    font-size: var(--text-small);
   }
   .list-label {
     padding-left: 7px;
@@ -2865,10 +2881,10 @@ textarea::placeholder {
     gap: 7px;
   }
   .settings-nav strong {
-    font-size: 9px;
+    font-size: var(--text-ui);
   }
   .settings-nav small {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .settings-nav > svg {
     width: 15px;
@@ -2903,16 +2919,16 @@ textarea::placeholder {
     box-shadow: -8px 0 25px #00000010;
   }
   .chat-header h2 {
-    font-size: 12px;
+    font-size: var(--text-ui);
   }
   .chat-header p {
-    font-size: 9px;
+    font-size: var(--text-small);
   }
   .chat-intro > p {
-    font-size: 10px;
+    font-size: var(--text-small);
   }
   .suggestion-list button {
-    font-size: 10px;
+    font-size: var(--text-small);
   }
   .meeting-content {
     padding-right: 0;
@@ -2922,7 +2938,7 @@ textarea::placeholder {
     gap: 21px;
   }
   .tabs > button {
-    font-size: 11px;
+    font-size: var(--text-ui);
   }
   .tabs > button svg {
     display: block;
@@ -2937,7 +2953,7 @@ textarea::placeholder {
     padding-right: 19px;
   }
   .segment-body p {
-    font-size: 12px;
+    font-size: var(--text-body);
   }
   .breadcrumb {
     display: none;
@@ -2947,10 +2963,10 @@ textarea::placeholder {
   }
   .transcript-search input {
     width: 130px;
-    font-size: 10px;
+    font-size: var(--text-small);
   }
   .follow-button {
-    font-size: 9px;
+    font-size: var(--text-small);
   }
   .title-row h1 {
     font-size: 22px;
@@ -2966,7 +2982,7 @@ textarea::placeholder {
     letter-spacing: 1px;
   }
   .welcome-heading p {
-    font-size: 11px;
+    font-size: var(--text-body);
   }
   .welcome-cards {
     flex-direction: column;
@@ -2985,7 +3001,7 @@ textarea::placeholder {
     font-size: 25px;
   }
   .welcome-cards p {
-    font-size: 10px;
+    font-size: var(--text-ui);
   }
   .wave-illustration {
     right: 33px;
@@ -3004,13 +3020,13 @@ textarea::placeholder {
     padding-top: 13px;
   }
   .welcome-bottom {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .setup-banner {
     margin-top: 25px;
   }
   .meeting-meta {
-    font-size: 9px;
+    font-size: var(--text-small);
   }
   .audio-player {
     padding: 0 20px;
@@ -3110,7 +3126,7 @@ textarea::placeholder {
     padding: 0 15px;
   }
   .topbar .button {
-    font-size: 9px;
+    font-size: var(--text-small);
     padding: 7px 9px;
     gap: 6px;
   }
@@ -3145,7 +3161,7 @@ textarea::placeholder {
     width: 14px;
   }
   .meeting-meta {
-    font-size: 8px;
+    font-size: var(--text-small);
     line-height: 1.7;
     gap: 6px;
   }
@@ -3156,7 +3172,7 @@ textarea::placeholder {
     gap: 15px;
   }
   .tabs > button {
-    font-size: 9px;
+    font-size: var(--text-ui);
     gap: 5px;
   }
   .tabs > button svg {
@@ -3175,25 +3191,25 @@ textarea::placeholder {
     padding: 14px 0 12px;
   }
   .transcript-search input {
-    font-size: 9px;
+    font-size: var(--text-small);
     width: 110px;
   }
   .transcript-search svg {
     width: 13px;
   }
   .follow-button {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .transcript-segment {
     gap: 9px;
     padding-right: 8px;
   }
   .segment-time {
-    font-size: 8px;
+    font-size: var(--text-small);
     width: 28px;
   }
   .segment-body p {
-    font-size: 11px;
+    font-size: var(--text-body);
     line-height: 1.95;
   }
   .speaker-name {
@@ -3225,7 +3241,7 @@ textarea::placeholder {
     width: 13px;
   }
   .player-time {
-    font-size: 8px;
+    font-size: var(--text-small);
     min-width: 24px;
   }
   .speed-control select {
@@ -3246,7 +3262,7 @@ textarea::placeholder {
     top: 80px;
   }
   .chat-compose textarea {
-    font-size: 11px;
+    font-size: var(--text-ui);
   }
   .chat-message {
     font-size: 12px;
@@ -3266,7 +3282,7 @@ textarea::placeholder {
     max-width: 220px;
   }
   .welcome-heading p {
-    font-size: 10px;
+    font-size: var(--text-body);
     line-height: 1.8;
   }
   .welcome-heading p br {
@@ -3276,7 +3292,7 @@ textarea::placeholder {
     font-size: 23px;
   }
   .welcome-cards p {
-    font-size: 9px;
+    font-size: var(--text-ui);
   }
   .welcome-cards > button {
     padding: 20px 18px 16px;
@@ -3339,7 +3355,7 @@ textarea::placeholder {
     font-size: 23px;
   }
   .modal-header p {
-    font-size: 9px;
+    font-size: var(--text-ui);
   }
   .modal-body {
     padding: 22px 21px;
@@ -3423,7 +3439,7 @@ textarea::placeholder {
     font-size: 25px;
   }
   .summary-copy {
-    font-size: 11px;
+    font-size: var(--text-body);
   }
   .actions-title {
     display: block;
@@ -3436,7 +3452,7 @@ textarea::placeholder {
     font-size: 23px;
   }
   .content-empty p {
-    font-size: 10px;
+    font-size: var(--text-ui);
   }
   .content-empty p br {
     display: none;
@@ -3467,10 +3483,10 @@ textarea::placeholder {
     gap: 8px;
   }
   .processing-card strong {
-    font-size: 9px;
+    font-size: var(--text-ui);
   }
   .processing-card p {
-    font-size: 8px;
+    font-size: var(--text-small);
   }
   .processing-icon {
     display: none;
@@ -4212,4 +4228,510 @@ textarea::placeholder {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Workspace system: neutral surfaces, one accent, and readable content at every size. */
+.brand {
+  margin-bottom: var(--space-8);
+  font-size: 25px;
+  letter-spacing: -1px;
+}
+.sidebar {
+  width: 232px;
+  flex-basis: 232px;
+  padding-top: var(--space-6);
+}
+.sidebar-search {
+  margin: var(--space-4) 0 var(--space-6);
+  border-radius: var(--radius-md);
+}
+.sidebar-nav {
+  border-radius: var(--radius-md);
+}
+.sidebar-nav.active {
+  background: #e9e9ed;
+  color: var(--ink);
+}
+.list-label {
+  font-size: var(--text-small);
+  letter-spacing: 0;
+  margin-bottom: var(--space-2);
+}
+.meeting-card {
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-md);
+}
+.meeting-card:hover {
+  background: #ededf0;
+}
+.meeting-card.selected {
+  background: var(--accent-soft);
+  border-color: transparent;
+  box-shadow: none;
+}
+.meeting-card.selected .meeting-card-icon {
+  color: var(--accent);
+}
+.meeting-card strong,
+.meeting-card.selected strong {
+  max-width: 156px;
+}
+.meeting-card small {
+  gap: var(--space-1);
+}
+.sidebar-bottom {
+  padding-top: var(--space-4);
+}
+.settings-nav {
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+.settings-nav:hover {
+  background: #e9e9ed;
+}
+.topbar {
+  height: 64px;
+  flex-basis: 64px;
+  padding: 0 var(--space-8);
+}
+.button {
+  border-radius: var(--radius-sm);
+  min-height: 38px;
+}
+.button.primary {
+  box-shadow: none;
+}
+.button.primary:active:not(:disabled) {
+  background: #47196f;
+}
+.button.secondary:active:not(:disabled),
+.icon-button:active:not(:disabled) {
+  background: #e9e9ed;
+}
+.meeting-heading {
+  padding: var(--space-6) var(--space-8) var(--space-4);
+}
+.title-row {
+  align-items: flex-start;
+}
+.title-row h1 {
+  font-size: 28px;
+  line-height: 1.3;
+  letter-spacing: -0.7px;
+}
+.title-row h1 button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.meeting-meta {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.meeting-workspace {
+  margin: 0 var(--space-8);
+}
+.meeting-content {
+  padding-right: var(--space-6);
+}
+.tabs-row {
+  height: 48px;
+}
+.selected-icon {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.overview-summary {
+  padding: var(--space-6) var(--space-2) var(--space-6) 0;
+}
+.notes-heading {
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.overview-summary .notes-heading h2,
+.notes-scroll > .notes-heading h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.summary-copy,
+.decision-list p,
+.segment-body p {
+  color: var(--ink);
+  line-height: 1.8;
+}
+.section-divider {
+  margin: var(--space-6) 0;
+}
+.section-label h3 {
+  font-size: var(--text-body);
+}
+.section-label .small-icon {
+  border: 0;
+  background: transparent;
+  width: 24px;
+  height: 24px;
+}
+.summary-footer {
+  font-size: var(--text-small);
+  color: var(--muted);
+}
+.transcript-tools {
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.transcript-search {
+  flex: 1;
+  min-width: 140px;
+}
+.transcript-search input {
+  min-width: 0;
+  width: 100%;
+}
+.segment-time {
+  font-variant-numeric: tabular-nums;
+  min-height: 28px;
+}
+.transcript-end {
+  color: var(--muted);
+  font-size: var(--text-small);
+  letter-spacing: 0;
+}
+.word:hover,
+.word.search-word {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.word.active-word {
+  background: #e6d6f3;
+  color: #461b6c;
+  box-shadow: 0 0 0 2px #e6d6f3;
+}
+.on .toggle-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.chat-panel {
+  width: 260px;
+  flex-basis: 260px;
+  padding-left: var(--space-6);
+}
+.chat-header {
+  height: auto;
+  min-height: 72px;
+  gap: var(--space-2);
+}
+.assistant-icon {
+  background: transparent;
+  border: 0;
+  width: 24px;
+  height: 24px;
+}
+.chat-intro {
+  text-align: left;
+  padding: var(--space-4) 0;
+}
+.chat-intro > p {
+  max-width: none;
+  margin: 0 0 var(--space-4);
+  line-height: 1.6;
+}
+.suggestion-list {
+  gap: var(--space-2);
+}
+.suggestion-list button {
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  line-height: 1.5;
+  color: var(--ink);
+}
+.suggestion-list button:hover:not(:disabled) {
+  border-color: #bba6ce;
+  background: var(--accent-soft);
+}
+.chat-intro .chat-context {
+  justify-content: flex-start;
+  align-items: flex-start;
+  margin-top: var(--space-4);
+  line-height: 1.6;
+}
+.chat-context svg {
+  margin-top: 3px;
+}
+.chat-compose form {
+  padding: var(--space-2);
+  border-radius: calc(var(--radius-sm) + var(--space-2));
+  box-shadow: none;
+}
+.chat-compose form:focus-within {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+.chat-compose textarea {
+  padding: var(--space-1);
+  min-height: 64px;
+}
+.chat-compose textarea:focus {
+  outline: none;
+}
+.compose-bottom button {
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.audio-player {
+  flex-basis: 76px;
+  padding: 0 var(--space-8);
+  gap: var(--space-3);
+}
+.audio-file-icon {
+  color: var(--muted);
+  background: var(--surface);
+  border-color: var(--line);
+}
+.audio-label {
+  flex-basis: 150px;
+}
+.play-button {
+  width: 40px;
+  height: 40px;
+}
+.play-button svg {
+  margin-left: 1px;
+}
+.player-time,
+.meeting-meta,
+.meeting-card small,
+.count,
+.recording-timer,
+.markdown-notes table {
+  font-variant-numeric: tabular-nums;
+}
+.welcome {
+  padding: 48px clamp(24px, 5vw, 64px) var(--space-8);
+}
+.welcome-heading h1 {
+  max-width: 640px;
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -1.3px;
+  text-wrap: balance;
+}
+.welcome-heading p {
+  max-width: 520px;
+  margin-top: var(--space-4);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+.welcome-cards {
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+.welcome-cards > button {
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+}
+.welcome-record {
+  background: var(--surface);
+}
+.welcome-upload {
+  background: var(--surface-subtle);
+}
+.welcome-card-icon {
+  margin-bottom: var(--space-6);
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.welcome-record .welcome-card-icon {
+  color: var(--accent);
+}
+.welcome-cards h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.welcome-cards p {
+  line-height: 1.7;
+}
+.card-link {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  color: var(--ink);
+}
+.welcome-record .card-link {
+  background: var(--accent);
+  color: white;
+  border: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+}
+.welcome-record:hover:not(:disabled) .card-link {
+  background: var(--accent-hover);
+}
+.welcome-bottom {
+  flex-wrap: wrap;
+  line-height: 1.6;
+  gap: var(--space-4);
+}
+.welcome-bottom .inline-link {
+  color: var(--accent);
+  font-size: var(--text-small);
+}
+.modal {
+  border-radius: var(--radius-lg);
+}
+.modal-header h2 {
+  font-weight: 600;
+  text-wrap: balance;
+}
+.field input,
+.field select {
+  border-radius: var(--radius-sm);
+}
+.field input[type="password"] {
+  font-family: var(--font);
+}
+.toast {
+  animation: feedback-in var(--motion-feedback) ease-out;
+}
+.working-bar {
+  animation: feedback-in var(--motion-feedback) ease-out;
+}
+@keyframes feedback-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-width: 1100px) and (min-width: 601px) {
+  .sidebar {
+    width: 200px;
+    flex-basis: 200px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .brand {
+    margin-left: 4px;
+    gap: 8px;
+    font-size: 23px;
+  }
+  .meeting-card strong,
+  .meeting-card.selected strong {
+    max-width: 125px;
+  }
+  .meeting-card {
+    gap: 8px;
+  }
+  .settings-nav {
+    width: calc(100% + 24px);
+    margin: 0 -12px;
+    padding: 16px 12px;
+  }
+  .settings-nav > svg {
+    display: none;
+  }
+  .topbar {
+    padding: 0 var(--space-6);
+  }
+  .meeting-heading {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+  .meeting-workspace {
+    margin: 0 var(--space-6);
+  }
+  .meeting-content {
+    padding-right: var(--space-4);
+  }
+  .chat-panel {
+    width: 230px;
+    flex-basis: 230px;
+    padding-left: var(--space-4);
+  }
+  .audio-player {
+    padding: 0 var(--space-6);
+  }
+  .audio-label {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .sidebar {
+    width: 60px;
+    flex-basis: 60px;
+    padding: 24px 8px 0;
+  }
+  .brand {
+    margin: 0 0 24px;
+  }
+  .meeting-card {
+    padding: 12px 8px;
+  }
+  .topbar {
+    padding: 0 12px;
+    height: 60px;
+    flex-basis: 60px;
+  }
+  .topbar-actions {
+    gap: 8px;
+  }
+  .topbar .button {
+    padding: 8px;
+  }
+  .meeting-heading {
+    padding: 20px 16px 12px;
+  }
+  .title-row h1 {
+    font-size: 23px;
+  }
+  .meeting-workspace {
+    margin: 0 16px;
+  }
+  .meeting-content {
+    padding-right: 0;
+  }
+  .audio-player {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .welcome {
+    padding: 28px 20px;
+  }
+  .welcome-cards > button {
+    padding: 20px;
+  }
+}
+
+.summary-export {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: var(--space-4);
+}
+.summary-footer {
+  margin-top: var(--space-4);
+}
+.setup-banner strong {
+  font-size: var(--text-ui);
+}
+.setup-banner > div > span {
+  font-size: var(--text-small);
+  line-height: 1.6;
+}
+.welcome-upload .welcome-card-icon {
+  background: transparent;
+}
+.settings-tabs button,
+.settings-footer > span,
+.model-discovery,
+.model-discovery button {
+  font-size: var(--text-small);
 }

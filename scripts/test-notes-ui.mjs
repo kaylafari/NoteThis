@@ -8,6 +8,7 @@ async function run(root, scratch) {
   const { app, BrowserWindow } = require("electron");
   const { writeFile, mkdir } = require("node:fs/promises");
   const path = require("node:path");
+  const os = require("node:os");
   const assert = require("node:assert/strict");
   app.setPath("userData", path.join(scratch, "profile"));
   await app.whenReady();
@@ -17,9 +18,25 @@ async function run(root, scratch) {
   );
   const dataDir = path.join(scratch, "data");
   await mkdir(path.join(dataDir, "meetings"), { recursive: true });
+  await mkdir(path.join(dataDir, "audio"), { recursive: true });
+  const pcmBytes = 16000 * 2 * 20;
+  const wav = Buffer.alloc(44 + pcmBytes);
+  wav.write("RIFF", 0);
+  wav.writeUInt32LE(36 + pcmBytes, 4);
+  wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(16000, 24);
+  wav.writeUInt32LE(32000, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36);
+  wav.writeUInt32LE(pcmBytes, 40);
+  await writeFile(path.join(dataDir, "audio/fixture.wav"), wav);
   const meeting = {
     id: "fixture",
-    title: "Physics lesson",
+    title: "Sample · Physics lesson",
     createdAt: new Date().toISOString(),
     duration: 20,
     status: "ready",
@@ -68,6 +85,16 @@ async function run(root, scratch) {
   try {
     await w.loadURL(origin);
     const evalJS = (code) => w.webContents.executeJavaScript(code);
+    const snapshot = async (name) => {
+      // Flush React updates and Chromium paint before capturing a hidden window.
+      await new Promise((r) => setTimeout(r, 180));
+      await writeFile(
+        path.join(os.tmpdir(), `notethis-${name}.png`),
+        (await w.webContents.capturePage())
+          .resize({ width: w.getSize()[0] })
+          .toPNG(),
+      );
+    };
     const wait = async (code) => {
       for (let i = 0; i < 100; i++) {
         if (await evalJS(code)) return;
@@ -84,6 +111,7 @@ async function run(root, scratch) {
     assert.deepEqual(state.tabs, ["Overview", "Notes"]);
     assert.ok(state.order);
     assert.ok(!state.text.includes("Retired task"));
+    await snapshot("overview-refined");
     await evalJS(`document.querySelectorAll('[role=tab]')[1].click()`);
     await wait(`!!document.querySelector('.markdown-notes table')`);
     assert.equal(
@@ -92,19 +120,45 @@ async function run(root, scratch) {
       ),
       true,
     );
+    await snapshot("notes-refined");
     await evalJS(`document.querySelectorAll('[role=tab]')[0].click()`);
-    await wait(`!!document.querySelector('#segment-s2')`);
+    await wait(`!!document.querySelector('.overview-scroll #segment-s2')`);
     await evalJS(`document.querySelector('#segment-s2 .segment-time').click()`);
     assert.equal(
       await evalJS(`document.querySelector('audio').currentTime`),
       10,
     );
-    await writeFile(
-      "/private/tmp/notethis-overview.png",
-      (await w.webContents.capturePage()).toPNG(),
+    for (const width of [900, 600, 375]) {
+      w.setSize(width, 780);
+      await new Promise((r) => setTimeout(r, 150));
+      assert.ok(
+        await evalJS(`document.documentElement.scrollWidth <= innerWidth`),
+        `Page overflow at ${width}px`,
+      );
+      assert.ok(
+        await evalJS(
+          `document.querySelector('.overview-scroll').clientHeight > 160`,
+        ),
+        `Content has usable height at ${width}px`,
+      );
+      await snapshot(`overview-${width}`);
+    }
+    w.setSize(1280, 900);
+    await evalJS(`document.querySelector('.settings-nav').click()`);
+    await wait(`!!document.querySelector('.settings-tabs')`);
+    await snapshot("settings-refined");
+    await evalJS(
+      `document.querySelector('.modal-header .icon-button').click()`,
     );
+    await wait(`!document.querySelector('.settings-tabs')`);
+    await evalJS(`document.querySelector('.brand').click()`);
+    await wait(`!!document.querySelector('.welcome-heading')`);
+    await snapshot("home-refined");
+    await evalJS(`document.querySelector('.welcome-record').click()`);
+    await wait(`!!document.querySelector('.recording-body')`);
+    await snapshot("recorder-refined");
     console.log(
-      "PASS: overview ordering, retired actions, Markdown table/code/math and unsafe-content isolation",
+      "PASS: overview ordering, retired actions, Markdown table/code/math, timestamp seeking, responsive layout and screen captures",
     );
   } finally {
     w.destroy();
