@@ -164,8 +164,12 @@ test("first-launch guidance persists across ports, remains in settings, and prep
       const w = window as any,
         passed: string[] = [];
       const text = () => document.getElementById("root")!.textContent || "";
-      const until = async (predicate: () => unknown, name: string) => {
-        const deadline = performance.now() + 4000;
+      const until = async (
+        predicate: () => unknown,
+        name: string,
+        timeoutMs = 4000,
+      ) => {
+        const deadline = performance.now() + timeoutMs;
         while (performance.now() < deadline) {
           if (predicate()) {
             passed.push(name);
@@ -247,6 +251,8 @@ test("first-launch guidance persists across ports, remains in settings, and prep
       await until(
         () => !!document.querySelector('[data-state="ready"]'),
         "Explicit repair finishes without changing preferences",
+        // Preparation polls every 1.5s. Allow both network polls under CI load.
+        10000,
       );
       const python = [...document.querySelectorAll("label")]
         .find((label) => label.textContent?.includes("Python executable"))!
