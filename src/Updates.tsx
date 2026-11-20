@@ -139,10 +139,10 @@ export function UpdatesPanel({ busy = false }: { busy?: boolean }) {
         </p>
       )}
       <p className="provider-description">
-        NoteThis checks GitHub when it opens and every six hours. Downloads
-        start only when you choose them. A downloaded update installs when you
-        restart or next open the app. Your recordings, notes, settings and
-        models stay in place.
+        NoteThis checks GitHub each time you open the app. Downloads start only
+        when you choose them. A downloaded update installs when you restart or
+        next open the app. Your recordings, notes, settings and models stay in
+        place.
       </p>
       <p className="provider-description">
         If automatic installation fails, choose Download installer, quit

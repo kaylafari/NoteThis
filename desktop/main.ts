@@ -65,8 +65,6 @@ let server: {
   cancelUpdateRestart: () => void;
 } | null = null;
 let updates: UpdateController | undefined;
-let updateTimer: ReturnType<typeof setInterval> | undefined;
-let updateStartup: ReturnType<typeof setTimeout> | undefined;
 let origin = "";
 let shuttingDown = false;
 
@@ -288,7 +286,10 @@ function createWindow() {
   };
   powerMonitor.on("suspend", suspended);
   powerMonitor.on("resume", resumed);
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    win.show();
+    void updates?.check();
+  });
   win.on("closed", () => {
     powerMonitor.removeListener("suspend", suspended);
     powerMonitor.removeListener("resume", resumed);
@@ -335,6 +336,7 @@ if (!acquiredLock) app.quit();
 else {
   app.on("second-instance", () => {
     if (!mainWindow && origin) createWindow();
+    else void updates?.check();
     if (mainWindow?.isMinimized()) mainWindow.restore();
     mainWindow?.focus();
   });
@@ -408,13 +410,6 @@ else {
           isLocalApp(event.senderFrame?.url || ""),
         updates,
       );
-      updateStartup = setTimeout(() => void updates?.check(), 15000);
-      updateStartup.unref();
-      updateTimer = setInterval(
-        () => void updates?.check(),
-        6 * 60 * 60 * 1000,
-      );
-      updateTimer.unref();
       configurePermissions();
       Menu.setApplicationMenu(
         Menu.buildFromTemplate([
@@ -451,6 +446,7 @@ else {
       createWindow();
       app.on("activate", () => {
         if (!mainWindow) createWindow();
+        else void updates?.check();
       });
     })
     .catch((error) => {
@@ -475,8 +471,6 @@ app.on("will-quit", (event) => {
   if (!server || shuttingDown) return;
   event.preventDefault();
   shuttingDown = true;
-  clearTimeout(updateStartup);
-  clearInterval(updateTimer);
   updates?.dispose();
   const runningServer = server;
   server = null;
